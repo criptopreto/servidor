@@ -1,0 +1,148 @@
+'use strict'
+/*Configurar Variables de Entorno*/
+require('dotenv').config();
+/*Dependencias*/
+const express       = require('express');
+const compression   = require('compression');
+const helmet        = require('helmet');
+const cors          = require('cors');
+const bodyParser    = require('body-parser');
+const mongoose      = require('mongoose');
+const morgan        = require('morgan');
+const passport      = require('passport');
+const LocalStrategy = require('passport-local').Strategy;
+const JwtStrategy   = require('passport-jwt').Strategy;
+const ExtractJwt    = require('passport-jwt').ExtractJwt;
+const bcrypt        = require('bcrypt');
+const user_routes   = require('./routes/user');
+const data_routes   = require('./routes/data');
+const customMdw     = require('./middleware/custom');
+const coordenadas   = require('./models/coordenadas');
+
+/*Inicializacion*/
+const app       = express();
+const server    = require('http').Server(app);
+const io        = require('socket.io')(server);
+
+
+/*##Base de Datos##*/
+//MONGODB
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true
+}).catch((err)=>{
+    console.error('\x1b[41m\x1b[33m%s\x1b[0m', "Error al conectarse a la Base de Datos MongoDB:"); console.error(err); process.exit(1)
+}).then(()=>{console.log('\x1b[44m\x1b[33m%s\x1b[0m', "Base de Datos MongoDB Conectada")});
+
+//MYSQL
+const pool = require('./database.mysql');
+
+/*Configuracion*/
+app.set('puerto', process.env.PUERTO || 8080);
+passport.use(new LocalStrategy({
+    usernameField: "username",
+    passwordField: "password",
+    session: false
+}, (username, password, done)=>{
+    pool.query("Select * from usuario where username='" + username + "'", (err, result)=>{
+        if(err) done(err, null); //Error en la BD
+        if(result.length <= 0) return done(null, false); //El usuario no existe
+        else if (!bcrypt.compareSync(password, result[0].password)){return done(null, false)} //contraseña incorrecta
+        return done(null, result[0]) //Login Ok
+    });
+}));
+
+let opts = {};
+opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
+opts.secretOrKey = process.env.JWT_SECRET;
+opts.algorithms = [process.env.JWT_ALGORITHMS];
+
+passport.use(new JwtStrategy(opts, (jwt_payload, done)=>{
+    pool.query("Select * from usuario where idusuario='" + jwt_payload.sub + "'", (err, usuario) => {
+        if(err) return done(err, null) //Error en la bd
+        if(usuario.length <=0) return done(null, false) //Usuario no encontrado
+        return done(null, usuario[0]);
+    })
+}));
+
+/*Middlewares*/
+app.use(helmet());
+app.use(compression());
+app.use(cors());
+app.use(morgan('dev'));
+app.use(bodyParser.json());
+app.use(passport.initialize());
+
+/*routes*/
+app.use('/api', user_routes);
+app.use('/', data_routes);
+app.use(customMdw.errorHandler);
+app.use(customMdw.notFoundHandler);
+
+/*Inicio del Servidor*/
+server.listen(app.get('puerto'), async () => {
+    console.log(`Servidor iniciado en el puerto: ${app.get('puerto')}`);
+});
+
+/* Socket.io */
+
+const dashboard = io.of('/dashboard'); //Namespace: dashboard
+const suscriptores = io.of('/suscriptores'); //Namespace: suscriptores
+
+//###Name espace: dashboard
+const logs = require('./controllers/logs');
+dashboard.on('connection', (socket)=>{
+    console.log('(B)Hay 1 conexión: ', socket.id);
+    socket.on('enviar-data', datos=>{
+        console.log(datos)
+    });
+
+    socket.on('upd-conexion', async function(){
+        const data = await logs() || [];
+        socket.emit('dato-inicial', data);
+    });
+    socket.on('disconnect', ()=>{
+        console.log("Se desconectó: ", socket.id);
+    });
+});
+
+
+//### | Namespace: suscriptores
+suscriptores.on('connection', (socket)=>{    
+    console.log('(A)Hay 1 Conexión: ', socket.id);
+
+    socket.on('enviar-data', (data)=>{
+        console.log("(A)Data recibida: ", data); 
+        console.log("Enviando mensaje a dashboard:");
+        dashboard.emit('data-sus', data);
+    });
+
+    socket.on('upd-log', (msg)=>{
+        dashboard.emit('new-log', msg)
+    });
+
+    console.log('User Conncetion');
+
+    socket.on('connect user', function(user){
+        console.log("Connected user ");
+        io.emit('connect user', user);
+    });
+
+    socket.on('on typing', function(typing){
+        console.log("Typing.... ");
+        io.emit('on typing', typing);
+    });
+
+    socket.on('chat message', function(msg){
+        console.log("Message " + msg['message']);
+        io.emit('chat message', msg);
+    });
+
+    socket.on('coordenadas', function(msg){
+        //let json = JSON.parse(msg);
+        let newCoord = new coordenadas(msg);
+        newCoord.save();
+        console.log(msg);
+        console.log(new Date());
+        suscriptores.emit('coordenadasX', msg);
+    });
+});
