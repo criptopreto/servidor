@@ -29,6 +29,7 @@ router.post('/token/verificar', DataController.verificarToken);
 router.get('/audit/logbusqueda/:id',AuditController.ultimosRegistrosGeneral);
 router.get('/audit/logbusquedaPersonas/:id',AuditController.ultimosRegistrosPersonas);
 router.get('/audit/logbusquedaNumeros/:id',AuditController.ultimosRegistrosNumeros);
+router.post('/numerolotes', customMdw.ensureAuthenticated, DataController.extraerLotes);
 router.post('/perfil/avatar/:id',  upload.single('avatar'),(req, res) => {
     console.log(req.body.userid)
     res.json({msg: uuid()})

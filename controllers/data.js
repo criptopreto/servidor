@@ -246,6 +246,20 @@ let controller = {
         });
 
     },
+    extraerLotes: async(req, res)=>{
+        var numeros = JSON.parse(req.body.numeros);
+        if(!numeros){
+            res.json({error: true, mensaje: "El número es incorrecto."});
+            return;
+        }
+        await Suscriptor.find({NUMERO: {$in: numeros}})
+        .then(data=>{
+            res.json({error: false, data})
+        })
+        .catch(err=>{
+                res.json({error: true, mensaje: err})
+        });
+    },
     buscarCedulaRif: async (req, res, next) =>{
         //data = {idusuario, tipo_busqueda, dato_buscado, timestamp}
         var dataLog = {};
