@@ -8,6 +8,9 @@ router.post('/iniciar_sesion', UserController.login);
 router.post('/registrarse', UserController.register);
 
 router.get('/usuario/actual', customMdw.ensureAuthenticated, UserController.actual);
+router.get('/register', (req, res)=>{
+    res.render('index');
+})
 // router.get('/user/:id')
 router.get('/test', SampleController.unprotected);
 router.get('/protected', customMdw.ensureAuthenticated, SampleController.protected);

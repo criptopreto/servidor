@@ -8,9 +8,15 @@ const pool      = require('../database.mysql');
 
 let controller = {
     register: (req, res) =>{
+        console.log(req.body);
+        if(!req.body.username || !req.body.password || !req.body.correo) {
+            res.json({error: true, mensaje: "Datos inválidos"});
+            return
+        }
         pool.query("SELECT * from usuario where username='" + req.body.username + "'", (err, result)=>{
             if(err) res.json({error: true, mensaje:"Error con la base de datos"});
             if(result.length > 0){
+                console.log("Existe")
                 res.json({error: true, mensaje: "El usuario existe"});
             }else{
                 var hash = bcrypt.hashSync(req.body.password, parseInt(process.env.BCRYPT_ROUNDS));

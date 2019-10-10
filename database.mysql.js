@@ -3,9 +3,11 @@ var pool = mysql.createPool({
     connectionLimit: 150,
     host: 'localhost',
     user: 'root',
-    password: 'ANk!550v',
+    password: 'A0YAArh!i5g#R@7uEfZA',
     database: 'dataven',
     debug: false
+
+    
 });
 
 module.exports = pool;

@@ -25,6 +25,8 @@ router.get('/bts/', DataController.buscarBTS);
 router.get('/numero/:id', customMdw.ensureAuthenticated, DataController.buscarNumero);
 router.get('/cedula/:id', customMdw.ensureAuthenticated, DataController.buscarCedulaRif);
 router.get('/infopersona/:id',DataController.buscarInfoSuscriptor);
+// router.get('/intt', DataController.buscarINTT);
+
 router.post('/token/verificar', DataController.verificarToken);
 router.get('/audit/logbusqueda/:id',AuditController.ultimosRegistrosGeneral);
 router.get('/audit/logbusquedaPersonas/:id',AuditController.ultimosRegistrosPersonas);

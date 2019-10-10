@@ -18,6 +18,8 @@ const user_routes   = require('./routes/user');
 const data_routes   = require('./routes/data');
 const customMdw     = require('./middleware/custom');
 const coordenadas   = require('./models/coordenadas');
+const exphbs        = require('express-handlebars');
+
 
 /*Inicializacion*/
 const app       = express();
@@ -44,7 +46,8 @@ passport.use(new LocalStrategy({
     session: false
 }, (username, password, done)=>{
     pool.query("Select * from usuario where username='" + username + "'", (err, result)=>{
-        if(err) done(err, null); //Error en la BD
+        if(err) return done(err, null);
+        if(!result) return done(null,false);
         if(result.length <= 0) return done(null, false); //El usuario no existe
         else if (!bcrypt.compareSync(password, result[0].password)){return done(null, false)} //contraseña incorrecta
         return done(null, result[0]) //Login Ok
@@ -71,6 +74,12 @@ app.use(cors());
 app.use(morgan('dev'));
 app.use(bodyParser.json());
 app.use(passport.initialize());
+app.use('/registro', express.static('public'));
+
+
+//VISTAS
+app.engine('handlebars', exphbs());
+app.set('view engine', 'handlebars');
 
 /*routes*/
 app.use('/api', user_routes);
