@@ -160,6 +160,7 @@ const buscarINTT = async(dato)=>{
                 var tempLicencia = [];
                 var tempMultasPNB = [];
                 var tempMultasINTT = [];
+                var tempPropietarios = [];
                 for(var i = 0; i<indices_array.length;i++){
                     if(i===0)continue;
                     (i !== (indices_array.length - 1)) ? p = indices_array[i+1] : p = result.length;
@@ -183,12 +184,14 @@ const buscarINTT = async(dato)=>{
                     if(info.LICENCIA) tempLicencia.push(info.LICENCIA);
                     if(info.MULTAS_DVTT_PNB) tempMultasPNB.push(info.MULTAS_DVTT_PNB);
                     if(info.MULTAS_INTT) tempMultasINTT.push(info.MULTAS_INTT);
+                    if(info.PROPIETARIO) tempPropietarios.push(info.PROPIETARIO);
                 }
                 aux.error = false;
                 aux.vehiculos = tempVehiculos;
                 aux.licencia = tempLicencia;
                 aux.multasPNB = tempMultasPNB;
                 aux.multasINTT = tempMultasINTT;
+                aux.propietario = tempPropietarios;
                 return aux;
             }else{
                 return{error: true, mensaje: "Sin información"}
