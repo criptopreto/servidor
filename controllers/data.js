@@ -7,6 +7,7 @@ const axios     = require('axios');
 const passport  = require('passport');
 const isOnline      = require('is-online');
 const {cne, centros, infocnes} = require('../models/cne');
+const {persona_intt, licencia_intt, vehiculo_intt} = require('../models/intt');
 const {fanb} = require('../models/fanb');
 const {registrarLog} = require('../controllers/audit');
 const qs = require('querystring');
@@ -136,6 +137,27 @@ async function buscarFanb(cedula){
         resp.error = true;
         resp.mensaje = err;
         return resp;
+    });
+}
+
+const buscarINTTA = async(dato)=>{
+    var respuesta = {};
+    return await persona_intt.findOne({CEDULA: dato}).then(data=>{
+        if(data){
+            respuesta.error = false
+            respuesta.licencias = data.licencias;
+            respuesta.vehiculos = data.vehiculos;  
+            respuesta.multasPNB = data.multas_pnb;
+            respuesta.multasINTT = data.multas_intt;          
+        }else{
+            respuesta.error = true;
+            respuesta.mensaje = "Ningún registro encontrado"
+        }        
+        return respuesta;
+    }).catch(err=>{
+        respuesta.error = true;
+        respuesta.mensaje = err;
+        return respuesta;
     });
 }
 
@@ -352,7 +374,7 @@ let controller = {
         var infoFANB;
         var datoINTT={};
         var infoINTT;
-        var modo;
+        var modo, modb;
         //############# BUSCAR INFORMACIÓN DEL CNE ###############
         //Estrategia ABC || A -> BASE DE DATOS OFFLINE ACTUAL || B -> BASE DE DATOS ONLINE ACTUAL || C -> BASE DE DATOS OFFLINE 2012        
         infoCNE = await buscarBDAlfa(req.params.id); //BUSCAR LA INFORMACIÓN EN LA BASE DE DATOS (A)
@@ -374,9 +396,8 @@ let controller = {
                 }
             }
         }
-
+        
         infoFANB = await buscarFanb(cedula);
-
 
         //Buscar Información en el INTT
         console.log(tipo_doc);
@@ -399,7 +420,42 @@ let controller = {
             default:
                 break;
         }
-        infoINTT = await buscarINTT(datoINTT);
+        infoINTT = await buscarINTTA(datoINTT);
+        modb = "A";
+        if(infoINTT.error){//SI no se encuentra en la base de datos interna (A)
+            infoINTT = await buscarINTT(datoINTT);
+            if(!infoINTT.error){//Si Se encuentra la información On-Line
+                try{
+                    var vehiculos_add = [];
+                    if(infoINTT.vehiculos.length > 0){
+                        infoINTT.vehiculos.map((vehiculo)=>{
+                            let vh = new vehiculo_intt(vehiculo);
+                            vehiculos_add.push(vh)
+                        })
+                    }
+                    var licencia_add = [];
+                    if(infoINTT.licencia.length > 0){
+                        infoINTT.licencia.map((licencia)=>{
+                            let lc = new licencia_intt(licencia);
+                            licencia_add.push(lc)
+                        })
+                    }
+                    var nPersona_intt = {
+                        CEDULA: datoINTT,
+                        vehiculos: vehiculos_add,
+                        licencias: licencia_add,
+                        multas_intt: infoINTT.multasINTT[0].ESTATUS,
+                        multasPNB: infoINTT.multasPNB[0].ESTATUS,
+                        creado_por: req.user.username
+                    }
+                    var newPerINTT = new persona_intt(nPersona_intt);
+                    newPerINTT.save();
+                }catch(err){
+                    console.log(err);
+                }
+            } 
+        }
+        
 
         var respuesta = {};
         var hayCNE = true;

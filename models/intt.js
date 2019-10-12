@@ -1,6 +1,6 @@
 const {Schema,model} = require('mongoose');
 const PersonaIntt = new Schema({
-    cedula: {type: String},
+    CEDULA: {type: String},
     vehiculos: [VehiculoInttSchema],
     licencias: [LicenciaInttSchema],
     multas_intt: {type: String},
@@ -10,48 +10,55 @@ const PersonaIntt = new Schema({
 }, {collection: 'persona_intt'});
 
 const VehiculoInttSchema = new Schema({
-    placa: {type: String},
-    propietario: [PropietarioInttSchema],
-    year: {type: String},
-    categoria: {type: String},
-    categoria_id: {type: String},
-    clase: {type: String},
-    clase_id: {type: String},
-    cod_denuncia: {type: String},
-    color_principal: {type: String},
-    color_principal_id: {type: String},
-    color_secundario: {type: String},
-    color_secundario_id: {type: String},
-    d_status: {type: String},
-    estatus: {type: String},
-    fecha_denuncia: {type: String},
-    marca: {type: String},
-    marca_id: {type: String},
-    modelo: {type: String},
-    nomb_razon: {type: String},
-    nomb_situacion: {type: String},
-    placa_denuncia: {type: String},
-    razon_denuncia: {type: String},
-    serial_carrocieria: {type: String},
-    serial_motor: {type: String},
-    situacion_denuncia: {type: String},
-    tipo: {type: String},
-    tipo_id: {type: String},
-    uso: {type: String},
-    uso_id: {type: String}
+    PLACA: {type: String},
+    PROPIETARIO: [PropietarioInttSchema],
+    ANIA: {type: String},
+    CATEGORIA: {type: String},
+    CATEGORIA_ID: {type: String},
+    CLASE: {type: String},
+    CLASE_ID: {type: String},
+    COD_DENUNCIA1: {type: String},
+    COLOR_PRINCIPAL: {type: String},
+    COLOR_PRINCIPAL_ID: {type: String},
+    COLOR_SECUNDARIO: {type: String},
+    COLOR_SECUNDARIO_ID: {type: String},
+    D_STATUS: {type: String},
+    ESTATUS: {type: String},
+    FECHA_DENUNCIA1: {type: String},
+    MARCA: {type: String},
+    MARCA_ID: {type: String},
+    MODELO: {type: String},
+    NOMB_RAZON1: {type: String},
+    NOMB_SITUACION1: {type: String},
+    PLACA_DENUNCIA1: {type: String},
+    RAZON_DENUNCIA1: {type: String},
+    SERIAL_CARROCERIA: {type: String},
+    SERIAL_MOTOR: {type: String},
+    SITUACION_DENUNCIA1: {type: String},
+    TIPO: {type: String},
+    TIPO_ID: {type: String},
+    USO: {type: String},
+    USO_ID: {type: String}
 }, {collection: 'vehiculo_intt'});
 
 const LicenciaInttSchema = new Schema({
-    nombres: {type: String},
-    apellidos: {type: String},
-    grado: {type: String},
-    fecha_original: {type: String},
-    fecha_renovacion: {type: String},
-    condicion: {type: String}
+    NOMBRES: {type: String},
+    APELLIDOS: {type: String},
+    GRADO: {type: String},
+    FECHA_ORIGINAL: {type: String},
+    FECHA_RENOVACION: {type: String},
+    CONDICION: {type: String}
 }, {collection: 'licencia_intt'});
 
 const PropietarioInttSchema = new Schema({
-    
+    n_identificacion: {type: String},
+    dig_rif: {type: String},
+    primer_apellido: {type: String},
+    primer_nombre: {type: String},
+    segundo_apellido: {type: String},
+    segundo_nombre: {type: String},
+    razon_social: {type: String},
+    tipo_identificacion: {type: String}
 }, {collection: 'propietario_intt'})
 
 module.exports = {
