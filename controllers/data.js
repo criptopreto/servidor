@@ -447,7 +447,7 @@ let controller = {
                         licencias: licencia_add,
                         multas_intt: infoINTT.multasINTT[0].ESTATUS,
                         multasPNB: infoINTT.multasPNB[0].ESTATUS,
-                        creado_por: req.user.username
+                        creado_por: "test"
                     }
                     var newPerINTT = new persona_intt(nPersona_intt);
                     newPerINTT.save();
