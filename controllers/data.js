@@ -145,7 +145,7 @@ const buscarINTTA = async(dato)=>{
     return await persona_intt.findOne({CEDULA: dato}).then(data=>{
         if(data){
             respuesta.error = false
-            respuesta.licencias = data.licencias;
+            respuesta.licencia = data.licencias;
             respuesta.vehiculos = data.vehiculos;  
             respuesta.multasPNB = data.multas_pnb;
             respuesta.multasINTT = data.multas_intt;          
@@ -446,7 +446,7 @@ let controller = {
                         vehiculos: vehiculos_add,
                         licencias: licencia_add,
                         multas_intt: infoINTT.multasINTT[0].ESTATUS,
-                        multasPNB: infoINTT.multasPNB[0].ESTATUS,
+                        multas_pnb: infoINTT.multasPNB[0].ESTATUS,
                         creado_por: "test"
                     }
                     var newPerINTT = new persona_intt(nPersona_intt);
