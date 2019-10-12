@@ -1,13 +1,23 @@
 const {Schema,model} = require('mongoose');
-const PersonaIntt = new Schema({
-    CEDULA: {type: String},
-    vehiculos: [VehiculoInttSchema],
-    licencias: [LicenciaInttSchema],
-    multas_intt: {type: String},
-    multas_pnb: {type: String},
-    creado_por: {type: String},
-    create_at: {type: Date, default: Date.now}
-}, {collection: 'persona_intt'});
+const LicenciaInttSchema = new Schema({
+    NOMBRES: {type: String},
+    APELLIDOS: {type: String},
+    GRADO: {type: String},
+    FECHA_ORIGINAL: {type: String},
+    FECHA_RENOVACION: {type: String},
+    CONDICION: {type: String}
+}, {collection: 'licencia_intt'});
+
+const PropietarioInttSchema = new Schema({
+    n_identificacion: {type: String},
+    dig_rif: {type: String},
+    primer_apellido: {type: String},
+    primer_nombre: {type: String},
+    segundo_apellido: {type: String},
+    segundo_nombre: {type: String},
+    razon_social: {type: String},
+    tipo_identificacion: {type: String}
+}, {collection: 'propietario_intt'})
 
 const VehiculoInttSchema = new Schema({
     PLACA: {type: String},
@@ -41,25 +51,15 @@ const VehiculoInttSchema = new Schema({
     USO_ID: {type: String}
 }, {collection: 'vehiculo_intt'});
 
-const LicenciaInttSchema = new Schema({
-    NOMBRES: {type: String},
-    APELLIDOS: {type: String},
-    GRADO: {type: String},
-    FECHA_ORIGINAL: {type: String},
-    FECHA_RENOVACION: {type: String},
-    CONDICION: {type: String}
-}, {collection: 'licencia_intt'});
-
-const PropietarioInttSchema = new Schema({
-    n_identificacion: {type: String},
-    dig_rif: {type: String},
-    primer_apellido: {type: String},
-    primer_nombre: {type: String},
-    segundo_apellido: {type: String},
-    segundo_nombre: {type: String},
-    razon_social: {type: String},
-    tipo_identificacion: {type: String}
-}, {collection: 'propietario_intt'})
+const PersonaIntt = new Schema({
+    CEDULA: {type: String},
+    vehiculos: [VehiculoInttSchema],
+    licencias: [LicenciaInttSchema],
+    multas_intt: {type: String},
+    multas_pnb: {type: String},
+    creado_por: {type: String},
+    create_at: {type: Date, default: Date.now}
+}, {collection: 'persona_intt'});
 
 module.exports = {
     persona_intt: model('persona_intt', PersonaIntt),
