@@ -420,7 +420,7 @@ let controller = {
             default:
                 break;
         }
-        infoINTT = await buscarINTTA(datoINTT);
+        infoINTT = await buscarINTTA(datoINTT.h_identificacion);
         modb = "A";
         if(infoINTT.error){//SI no se encuentra en la base de datos interna (A)
             infoINTT = await buscarINTT(datoINTT);
@@ -442,7 +442,7 @@ let controller = {
                         })
                     }
                     var nPersona_intt = {
-                        CEDULA: datoINTT,
+                        CEDULA: datoINTT.h_identificacion,
                         vehiculos: vehiculos_add,
                         licencias: licencia_add,
                         multas_intt: infoINTT.multasINTT[0].ESTATUS,
