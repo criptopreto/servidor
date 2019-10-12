@@ -425,6 +425,7 @@ let controller = {
         if(infoINTT.error){//SI no se encuentra en la base de datos interna (A)
             infoINTT = await buscarINTT(datoINTT);
             if(!infoINTT.error){//Si Se encuentra la información On-Line
+                modb = "B"
                 try{
                     var vehiculos_add = [];
                     if(infoINTT.vehiculos.length > 0){
@@ -470,7 +471,8 @@ let controller = {
             respuesta.hayCNE = hayCNE;
             respuesta.hayFANB = hayFANB;
             respuesta.hayINTT = hayINTT;
-            respuesta.modo = modo
+            respuesta.modo = modo;
+            respuesta.modb = modb;
             respuesta.firmoContra = firmoContra;
             respuesta.infoCNE = infoCNE;
             respuesta.infoFANB = infoFANB;
