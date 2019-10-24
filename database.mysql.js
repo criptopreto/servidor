@@ -3,7 +3,7 @@ var pool = mysql.createPool({
     connectionLimit: 150,
     host: 'localhost',
     user: 'root',
-    password: 'A0YAArh!i5g#R@7uEfZA',
+    password: 'SPDT2019*-',
     database: 'dataven',
     debug: false
 
