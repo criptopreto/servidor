@@ -2,29 +2,29 @@
 /*Configurar Variables de Entorno*/
 require('dotenv').config();
 /*Dependencias*/
-const express       = require('express');
-const compression   = require('compression');
-const helmet        = require('helmet');
-const cors          = require('cors');
-const bodyParser    = require('body-parser');
-const mongoose      = require('mongoose');
-const morgan        = require('morgan');
-const passport      = require('passport');
+const express = require('express');
+const compression = require('compression');
+const helmet = require('helmet');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const morgan = require('morgan');
+const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
-const JwtStrategy   = require('passport-jwt').Strategy;
-const ExtractJwt    = require('passport-jwt').ExtractJwt;
-const bcrypt        = require('bcrypt');
-const user_routes   = require('./routes/user');
-const data_routes   = require('./routes/data');
-const customMdw     = require('./middleware/custom');
-const coordenadas   = require('./models/coordenadas');
-const exphbs        = require('express-handlebars');
+const JwtStrategy = require('passport-jwt').Strategy;
+const ExtractJwt = require('passport-jwt').ExtractJwt;
+const bcrypt = require('bcrypt');
+const user_routes = require('./routes/user');
+const data_routes = require('./routes/data');
+const customMdw = require('./middleware/custom');
+const coordenadas = require('./models/coordenadas');
+const exphbs = require('express-handlebars');
 
 
 /*Inicializacion*/
-const app       = express();
-const server    = require('http').Server(app);
-const io        = require('socket.io')(server);
+const app = express();
+const server = require('http').Server(app);
+const io = require('socket.io')(server);
 
 
 /*##Base de Datos##*/
