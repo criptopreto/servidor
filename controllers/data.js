@@ -121,6 +121,32 @@ async function buscarDBCharlie (dato){ // C -> Base de datos CNE Offline (versi�
     })
 }
 
+
+//BUSCAR INFORMACIÓN EN EL IPSFA
+//PRIMERO BUSCAMOS LA INFORMACIÓN ONLINE YA QUE ES LA MÁS ACTUALIZADA
+async function buscarIpsfa(cedula){
+    var resp = {};
+    return await axios.get('http://10.51.20.51:3000/api/ipsfa/' + cedula).then(datos=>{
+        if(datos.data){
+            if(!datos.data.error){
+                resp.error = false;
+                resp.info = datos.data.informacion;                
+            }else{
+                resp.error = true;
+                resp.info = "No encontrado";
+            }
+        }else{
+            resp.error = true;
+            resp.info = "No encontrado";
+        }
+        return resp;
+    }).catch(err=>{
+        resp.error = true;
+        resp.info = "No encontrado";
+        return resp;
+    })
+}
+
 async function buscarFanb(cedula){
     var resp = {};
     return await fanb.findOne({CEDULA: cedula}).then((data)=>{
@@ -372,6 +398,7 @@ let controller = {
         var firmoContra = await checkFirma(cedula);
         var infoCNE;
         var infoFANB;
+        var infoIPSFA;
         var datoINTT={};
         var infoINTT;
         var modo, modb;
@@ -396,9 +423,24 @@ let controller = {
                 }
             }
         }
+        infoIPSFA = await buscarIpsfa(cedula);
+        if(!infoIPSFA.error){
+            infoFANB = {};
+            var info = {};
+            info.APELLIDOS = infoIPSFA.info.Persona.DatoBasico.apellidoprimero;
+            info.NOMBRES = infoIPSFA.info.Persona.DatoBasico.nombreprimero;
+            info.CARNET = infoIPSFA.info.codigocomponente;
+            info.COMPONENTE = infoIPSFA.info.Componente.descripcion;            
+            info.GRADO = infoIPSFA.info.Grado.descripcion;
+            info.CATEGORIA = infoIPSFA.info.categoria;
+            info.GREMIO = infoIPSFA.info.clase;
+            console.log(info);
+            infoFANB.info = info;
+            infoFANB.error = false;
+        }else{
+            infoFANB = await buscarFanb(cedula);
+        }
         
-        infoFANB = await buscarFanb(cedula);
-
         //Buscar Información en el INTT
         console.log(tipo_doc);
         switch (tipo_doc) {
@@ -457,7 +499,6 @@ let controller = {
             } 
         }
         
-
         var respuesta = {};
         var hayCNE = true;
         var hayFANB = true;
@@ -477,6 +518,7 @@ let controller = {
             respuesta.infoCNE = infoCNE;
             respuesta.infoFANB = infoFANB;
             respuesta.infoINTT = infoINTT;
+            respuesta.infoIPSFA = infoIPSFA;
             res.json(respuesta);
         } catch (error) {
             console.log("Error: ", error);
