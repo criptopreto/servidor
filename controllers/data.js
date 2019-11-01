@@ -283,6 +283,7 @@ const buscarDBBravo = async(cedula) =>{ // B -> Base de Datos CNE Online (VersiÃ
                 respuesta.info = infor;
 
                 return respuesta;
+                
             }
         }).catch(err=>{
             const respuesta = {};
