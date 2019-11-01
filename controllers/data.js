@@ -12,6 +12,26 @@ const {fanb} = require('../models/fanb');
 const {registrarLog} = require('../controllers/audit');
 const qs = require('querystring');
 
+async function RegistrarOnfalo(data){
+    var dataPersona = {};
+    var dataCentros = {};
+    var dataINTT = {};
+    var dataIPSFA = {};
+    var dataSENIAT = {};
+    var dataFANB = {};
+    var dataSolicitados = {};
+    var dataFirmazo = {};
+    var dataSuscriptor = {};
+
+    //IMPORTAMOS LA INFORMACIÓN DEL CNE
+    if(data.dataCNE){
+        dataPersona.tipoCedula = data.dataCNE.tipoCedula;
+        dataPersona.cedula = data.dataCNE.cedula;
+        dataPersona.nombres = data.dataCNE.nombres;
+        dataPersona.apellidos = data.dataCNE.apellidos;    
+    }
+}
+
 async function buscarBTS(data) {
     let tipo = parseInt(data.tipo);
     let dato = data.dato.toUpperCase();
