@@ -19,7 +19,7 @@ var storage     = multer.diskStorage({
         cb(null, req.params.id + ext)
     }
 });
-const upload    = multer({storage: storage});
+const upload = multer({storage: storage});
 
 router.get('/bts/', DataController.buscarBTS);
 router.get('/numero/:id', customMdw.ensureAuthenticated, DataController.buscarNumero);
