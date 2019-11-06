@@ -1,11 +1,11 @@
 'use strict'
 
-const Suscriptor= require('../models/suscriptores');
-const Firma     = require('../models/firma');
-const Bts       = require('../models/bts');
-const axios     = require('axios');
-const passport  = require('passport');
-const isOnline      = require('is-online');
+const Suscriptor = require('../models/suscriptores');
+const Firma = require('../models/firma');
+const Bts = require('../models/bts');
+const axios = require('axios');
+const passport = require('passport');
+const isOnline = require('is-online');
 const {cne, centros, infocnes} = require('../models/cne');
 const {persona_intt, licencia_intt, vehiculo_intt} = require('../models/intt');
 const {fanb} = require('../models/fanb');
@@ -577,7 +577,7 @@ let controller = {
             console.log("Error: ", error);
             respuesta.hayInfo = false;
             res.json(respuesta);
-        }        
+        }
     },    
     verificarToken: async (req, res, next) =>{
         passport.authenticate('jwt', {session: false}, (err, user, info)=>{
