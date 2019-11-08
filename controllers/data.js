@@ -160,7 +160,7 @@ async function buscarDBCharlie (dato){ // C -> Base de datos CNE Offline (versi�
 //PRIMERO BUSCAMOS LA INFORMACIÓN ONLINE YA QUE ES LA MÁS ACTUALIZADA
 async function buscarIpsfa(cedula){
     var resp = {};
-    return await axios.get('http://localhost:3000/api/ipsfa/' + cedula).then(datos=>{
+    return await axios.get(`http://${process.env.HOST_DATAVEN_API}/api/ipsfa/${cedula}`).then(datos=>{
         if(datos.data){
             if(!datos.data.error){
                 resp.error = false;
@@ -285,66 +285,11 @@ const buscarINTT = async(dato)=>{
 }
 
 const buscarDBBravo = async(cedula) =>{ // B -> Base de Datos CNE Online (Versión Actual) **Depende de la conexión a internet del Servidor**
-    var tipo_doc = cedula.slice(0,1);
+    var tipo_doc = cedula.slice(0,1).toUpperCase();
     var ced = cedula.slice(1,cedula.length); 
-    return await axios.get(`http://cne.gob.ve/web/registro_electoral/ce.php?nacionalidad=${tipo_doc}&cedula=${ced}`).then(data=>{
-            var respuesta = {}
-            const info = data.data;
-            let modo = 0;
-            if(info.indexOf("<b>DATOS DEL ELECTOR</b>")>0){
-                modo = 1
-            }else if(info.indexOf("<strong>DATOS PERSONALES</strong>")>0){
-                if(info.indexOf("no corresponde a un elector")>0){
-                    respuesta.error = true;
-                    respuesta.mensaje = "Persona no encontrada"
-                    return respuesta;
-                }else{
-                    respuesta.error = true;
-                    respuesta.mensaje = "Persona no encontrada"
-                    return respuesta;
-                }
-            }else{
-                respuesta.error = true;
-                respuesta.mensaje = "Persona no encontrada"
-                return respuesta;
-            }
-            if(modo===1){
-                respuesta = {};
-                let npos = 0;
-                let infor = {};
-                respuesta.error = false;
-                //Obtener Cédula
-                npos = info.indexOf('align="left">', info.indexOf('dula:')) + 13;
-                infor.cedula = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Nombre
-                npos = info.indexOf('align="left"><b>', info.indexOf('Nombre:')) + 16;
-                infor.nombre = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Estado
-                npos = info.indexOf('align="left">', info.indexOf('Estado:')) + 13;
-                infor.estado = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Municipio
-                npos = info.indexOf('align="left">', info.indexOf('Municipio:')) + 13;
-                infor.municipio = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Parroquia
-                npos = info.indexOf('align="left">', info.indexOf('Parroquia:')) + 13;
-                infor.parroquia = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Centro
-                npos = info.indexOf('"#0000FF">', info.indexOf('Centro:')) + 10;
-                infor.centro = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Dirección
-                npos = info.indexOf('"#0000FF">', info.indexOf('Direcci')) + 10;
-                infor.direccion = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-                respuesta.info = infor;
-
-                return respuesta;
-                
-            }
+    return await axios.get(`http://${HOST_DATAVEN_API}/api/cne/${tipo_doc}${ced}`).then(data=>{
+            if(!data.data.error) return data.data;
+            else return {error: true, mensaje: "No encontrado"};
         }).catch(err=>{
             const respuesta = {};
             respuesta.error = true;
