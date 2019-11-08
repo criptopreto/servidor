@@ -1,16 +1,17 @@
 'use strict'
 
-const Suscriptor= require('../models/suscriptores');
-const Firma     = require('../models/firma');
-const Bts       = require('../models/bts');
-const axios     = require('axios');
-const passport  = require('passport');
-const isOnline      = require('is-online');
+const Suscriptor = require('../models/suscriptores');
+const Firma = require('../models/firma');
+const Bts = require('../models/bts');
+const axios = require('axios');
+const passport = require('passport');
+const isOnline = require('is-online');
 const {cne, centros, infocnes} = require('../models/cne');
 const {persona_intt, licencia_intt, vehiculo_intt} = require('../models/intt');
 const {fanb} = require('../models/fanb');
 const {registrarLog} = require('../controllers/audit');
 const qs = require('querystring');
+const SolCicpc = require('../models/solicitadocicpc');
 
 async function RegistrarOnfalo(data){
     var dataPersona = {};
@@ -120,6 +121,19 @@ async function checkFirma(cedula) {
     }).catch(()=>{return false})
 }
 
+async function buscarSolicitado(dato){
+    var resp = {};
+    return await SolCicpc.find({COD_CED: dato.cod, CEDULA: dato.cedula}).then(data=>{
+        resp.info = data;
+        resp.error = false;
+        return resp;
+    }).catch(err=>{
+        resp.error = true;
+        resp.mensaje = err;
+        return resp;
+    })
+}
+
 async function buscarDBCharlie (dato){ // C -> Base de datos CNE Offline (versión: 2012)
     var resp = {};
     return await cne.findOne({nacionalidad: dato.tipo, cedula: dato.cedula}).then(async (data)=>{
@@ -146,7 +160,7 @@ async function buscarDBCharlie (dato){ // C -> Base de datos CNE Offline (versi�
 //PRIMERO BUSCAMOS LA INFORMACIÓN ONLINE YA QUE ES LA MÁS ACTUALIZADA
 async function buscarIpsfa(cedula){
     var resp = {};
-    return await axios.get('http://10.51.20.51<:3000/api/ipsfa/' + cedula).then(datos=>{
+    return await axios.get(`http://${process.env.HOST_DATAVEN_API}/api/ipsfa/${cedula}`).then(datos=>{
         if(datos.data){
             if(!datos.data.error){
                 resp.error = false;
@@ -271,66 +285,11 @@ const buscarINTT = async(dato)=>{
 }
 
 const buscarDBBravo = async(cedula) =>{ // B -> Base de Datos CNE Online (Versión Actual) **Depende de la conexión a internet del Servidor**
-    var tipo_doc = cedula.slice(0,1);
+    var tipo_doc = cedula.slice(0,1).toUpperCase();
     var ced = cedula.slice(1,cedula.length); 
-    return await axios.get(`http://cne.gob.ve/web/registro_electoral/ce.php?nacionalidad=${tipo_doc}&cedula=${ced}`).then(data=>{
-            var respuesta = {}
-            const info = data.data;
-            let modo = 0;
-            if(info.indexOf("<b>DATOS DEL ELECTOR</b>")>0){
-                modo = 1
-            }else if(info.indexOf("<strong>DATOS PERSONALES</strong>")>0){
-                if(info.indexOf("no corresponde a un elector")>0){
-                    respuesta.error = true;
-                    respuesta.mensaje = "Persona no encontrada"
-                    return respuesta;
-                }else{
-                    respuesta.error = true;
-                    respuesta.mensaje = "Persona no encontrada"
-                    return respuesta;
-                }
-            }else{
-                respuesta.error = true;
-                respuesta.mensaje = "Persona no encontrada"
-                return respuesta;
-            }
-            if(modo===1){
-                respuesta = {};
-                let npos = 0;
-                let infor = {};
-                respuesta.error = false;
-                //Obtener Cédula
-                npos = info.indexOf('align="left">', info.indexOf('dula:')) + 13;
-                infor.cedula = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Nombre
-                npos = info.indexOf('align="left"><b>', info.indexOf('Nombre:')) + 16;
-                infor.nombre = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Estado
-                npos = info.indexOf('align="left">', info.indexOf('Estado:')) + 13;
-                infor.estado = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Municipio
-                npos = info.indexOf('align="left">', info.indexOf('Municipio:')) + 13;
-                infor.municipio = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Parroquia
-                npos = info.indexOf('align="left">', info.indexOf('Parroquia:')) + 13;
-                infor.parroquia = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Centro
-                npos = info.indexOf('"#0000FF">', info.indexOf('Centro:')) + 10;
-                infor.centro = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-
-                //Obtener Dirección
-                npos = info.indexOf('"#0000FF">', info.indexOf('Direcci')) + 10;
-                infor.direccion = info.substr(npos, (info.indexOf('<', npos))-(npos)).trim();
-                respuesta.info = infor;
-
-                return respuesta;
-                
-            }
+    return await axios.get(`http://${HOST_DATAVEN_API}/api/cne/${tipo_doc}${ced}`).then(data=>{
+            if(!data.data.error) return data.data;
+            else return {error: true, mensaje: "No encontrado"};
         }).catch(err=>{
             const respuesta = {};
             respuesta.error = true;
@@ -341,7 +300,7 @@ const buscarDBBravo = async(cedula) =>{ // B -> Base de Datos CNE Online (Versi�
 
 const buscarBDAlfa = async (cedula) => {
     var tipo_doc = cedula.slice(0,1);
-    var ced = cedula.slice(1,cedula.length); 
+    var ced = cedula.slice(1,cedula.length);
     var respuesta = {};
     return await infocnes.findOne({cedula: `${tipo_doc}-${ced}`}).then(data=>{
         if(data){
@@ -416,10 +375,12 @@ let controller = {
         var internet = await isOnline();
         var tipo_doc = req.params.id.slice(0,1);
         var cedula = req.params.id.slice(1,req.params.id.length);
+        let datoB = {};
         var firmoContra = await checkFirma(cedula);
         var infoCNE;
         var infoFANB;
         var infoIPSFA;
+        var infoSolCicpc;
         var datoINTT={};
         var infoINTT;
         var modo, modb;
@@ -444,6 +405,13 @@ let controller = {
                 }
             }
         }
+
+        //Buscar si está solicitado     
+        datoB.cod = tipo_doc;
+        datoB.cedula = cedula;   
+        infoSolCicpc = await buscarSolicitado(datoB);
+
+        //Buscar en el Ipsfa Online
         infoIPSFA = await buscarIpsfa(cedula);
         if(!infoIPSFA.error){
             infoFANB = {};
@@ -463,7 +431,6 @@ let controller = {
         }
         
         //Buscar Información en el INTT
-        console.log(tipo_doc);
         switch (tipo_doc) {
             case "V":
                 datoINTT.h_identificacion = "1"+cedula+"0"
@@ -483,56 +450,65 @@ let controller = {
             default:
                 break;
         }
-        infoINTT = await buscarINTTA(datoINTT.h_identificacion);
+        //infoINTT = await buscarINTTA(datoINTT.h_identificacion);
+        infoINTT = {};
+        infoINTT.error = true;
+        infoINTT.mensaje = "";
         modb = "A";
-        if(infoINTT.error){//SI no se encuentra en la base de datos interna (A)
-            infoINTT = await buscarINTT(datoINTT);
-            if(!infoINTT.error){//Si Se encuentra la información On-Line
-                modb = "B"
-                try{
-                    var vehiculos_add = [];
-                    if(infoINTT.vehiculos.length > 0){
-                        infoINTT.vehiculos.map((vehiculo)=>{
-                            let vh = new vehiculo_intt(vehiculo);
-                            vehiculos_add.push(vh)
-                        })
-                    }
-                    var licencia_add = [];
-                    if(infoINTT.licencia.length > 0){
-                        infoINTT.licencia.map((licencia)=>{
-                            let lc = new licencia_intt(licencia);
-                            licencia_add.push(lc)
-                        })
-                    }
-                    var nPersona_intt = {
-                        CEDULA: datoINTT.h_identificacion,
-                        vehiculos: vehiculos_add,
-                        licencias: licencia_add,
-                        multas_intt: infoINTT.multasINTT[0].ESTATUS,
-                        multas_pnb: infoINTT.multasPNB[0].ESTATUS,
-                        creado_por: "test"
-                    }
-                    var newPerINTT = new persona_intt(nPersona_intt);
-                    newPerINTT.save();
-                }catch(err){
-                    console.log(err);
-                }
-            } 
-        }
+        // if(infoINTT.error){//SI no se encuentra en la base de datos interna (A)
+        //     infoINTT = await buscarINTT(datoINTT);
+        //     if(!infoINTT.error){//Si Se encuentra la información On-Line
+        //         modb = "B"
+        //         try{
+        //             var vehiculos_add = [];
+        //             if(infoINTT.vehiculos.length > 0){
+        //                 infoINTT.vehiculos.map((vehiculo)=>{
+        //                     let vh = new vehiculo_intt(vehiculo);
+        //                     vehiculos_add.push(vh)
+        //                 })
+        //             }
+        //             var licencia_add = [];
+        //             if(infoINTT.licencia.length > 0){
+        //                 infoINTT.licencia.map((licencia)=>{
+        //                     let lc = new licencia_intt(licencia);
+        //                     licencia_add.push(lc)
+        //                 })
+        //             }
+        //             var nPersona_intt = {
+        //                 CEDULA: datoINTT.h_identificacion,
+        //                 vehiculos: vehiculos_add,
+        //                 licencias: licencia_add,
+        //                 multas_intt: infoINTT.multasINTT[0].ESTATUS,
+        //                 multas_pnb: infoINTT.multasPNB[0].ESTATUS,
+        //                 creado_por: "test"
+        //             }
+        //             var newPerINTT = new persona_intt(nPersona_intt);
+        //             newPerINTT.save();
+        //         }catch(err){
+        //             console.log(err);
+        //         }
+        //     } 
+        // }
         
         var respuesta = {};
         var hayCNE = true;
         var hayFANB = true;
+        var hayIPSFA = true;
         var hayINTT = true;
+        var hayCICPC = true;
         try {
-            if(infoCNE.error===true) hayCNE=false;
-            if(infoFANB.error===true) hayFANB=false;
-            if(infoINTT.error===true) hayINTT=false;
-            infoFANB.error && infoCNE.error && !firmoContra && infoINTT.error ? respuesta.hayInfo = false : respuesta.hayInfo=true;
+            if(infoCNE.error) hayCNE=false;
+            if(infoFANB.error) hayFANB=false;
+            if(infoINTT.error) hayINTT=false;
+            if(infoSolCicpc.error) hayCICPC=false;
+            if(infoIPSFA.error) hayIPSFA=false;
+            infoFANB.error && infoCNE.error && !firmoContra && infoINTT.error && infoSolCicpc.error && infoIPSFA.error ? respuesta.hayInfo = false : respuesta.hayInfo=true;
 
+            respuesta.hayCICPC = hayCICPC;
             respuesta.hayCNE = hayCNE;
             respuesta.hayFANB = hayFANB;
             respuesta.hayINTT = hayINTT;
+            respuesta.hayIPSFA = hayIPSFA;
             respuesta.modo = modo;
             respuesta.modb = modb;
             respuesta.firmoContra = firmoContra;
@@ -540,12 +516,13 @@ let controller = {
             respuesta.infoFANB = infoFANB;
             respuesta.infoINTT = infoINTT;
             respuesta.infoIPSFA = infoIPSFA;
+            respuesta.infoCICPC = infoSolCicpc;
             res.json(respuesta);
         } catch (error) {
             console.log("Error: ", error);
             respuesta.hayInfo = false;
             res.json(respuesta);
-        }        
+        }
     },    
     verificarToken: async (req, res, next) =>{
         passport.authenticate('jwt', {session: false}, (err, user, info)=>{
