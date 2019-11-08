@@ -1,13 +1,13 @@
-const express           = require('express');
-const router            = express.Router();
-const customMdw         = require('../middleware/custom');
-const DataController    = require('../controllers/data');
-const AuditController   = require('../controllers/audit');
-const multer    = require('multer');
-const path      = require('path');
-const mime     = require('mime');
-const uuid      = require('uuid');
-var storage     = multer.diskStorage({
+const express = require('express');
+const router = express.Router();
+const customMdw = require('../middleware/custom');
+const DataController = require('../controllers/data');
+const AuditController = require('../controllers/audit');
+const multer = require('multer');
+const path = require('path');
+const mime = require('mime');
+const uuid = require('uuid');
+var storage = multer.diskStorage({
     destination: function(req, res, cb) {
         cb(null, 'usuarios/perfil/img/')
     },
@@ -19,7 +19,7 @@ var storage     = multer.diskStorage({
         cb(null, req.params.id + ext)
     }
 });
-const upload    = multer({storage: storage});
+const upload = multer({storage: storage});
 
 router.get('/bts/', DataController.buscarBTS);
 router.get('/numero/:id', customMdw.ensureAuthenticated, DataController.buscarNumero);

@@ -146,7 +146,7 @@ async function buscarDBCharlie (dato){ // C -> Base de datos CNE Offline (versi�
 //PRIMERO BUSCAMOS LA INFORMACIÓN ONLINE YA QUE ES LA MÁS ACTUALIZADA
 async function buscarIpsfa(cedula){
     var resp = {};
-    return await axios.get('http://10.51.20.51:3000/api/ipsfa/' + cedula).then(datos=>{
+    return await axios.get('http://10.51.20.51<:3000/api/ipsfa/' + cedula).then(datos=>{
         if(datos.data){
             if(!datos.data.error){
                 resp.error = false;
