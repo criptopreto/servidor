@@ -5,7 +5,6 @@ const Firma = require('../models/firma');
 const Bts = require('../models/bts');
 const axios = require('axios');
 const passport = require('passport');
-const isOnline = require('is-online');
 const {cne, centros, infocnes} = require('../models/cne');
 const {persona_intt, licencia_intt, vehiculo_intt} = require('../models/intt');
 const {fanb} = require('../models/fanb');
@@ -124,8 +123,9 @@ async function checkFirma(cedula) {
 async function buscarSolicitado(dato){
     var resp = {};
     return await SolCicpc.find({COD_CED: dato.cod, CEDULA: dato.cedula}).then(data=>{
+        if(data.length > 0) resp.error = false;
+        else resp.error = true;
         resp.info = data;
-        resp.error = false;
         return resp;
     }).catch(err=>{
         resp.error = true;
@@ -222,7 +222,7 @@ const buscarINTTA = async(dato)=>{
 }
 
 const buscarINTT = async(dato)=>{
-    return await axios.post('http://10.51.13.20/intt/consulta.php', qs.stringify(dato), {headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
+    return await axios.post(`http://${process.env.HOST_INTT_API}/dataven/intt/consult.php`, qs.stringify(dato), {headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
         .then(data=>{
             if(data.data.indexOf("RESULTADOS DE LA B") ===-1) return {error: true, mensaje: "Error en la pagina"}
             if(data.data.indexOf("SIN RESULTADOS") === -1){                
@@ -287,7 +287,7 @@ const buscarINTT = async(dato)=>{
 const buscarDBBravo = async(cedula) =>{ // B -> Base de Datos CNE Online (Versión Actual) **Depende de la conexión a internet del Servidor**
     var tipo_doc = cedula.slice(0,1).toUpperCase();
     var ced = cedula.slice(1,cedula.length); 
-    return await axios.get(`http://${HOST_DATAVEN_API}/api/cne/${tipo_doc}${ced}`).then(data=>{
+    return await axios.get(`http://${process.env.HOST_DATAVEN_API}/api/cne/${tipo_doc}${ced}`).then(data=>{
             if(!data.data.error) return data.data;
             else return {error: true, mensaje: "No encontrado"};
         }).catch(err=>{
@@ -372,7 +372,6 @@ let controller = {
     },
     buscarInfoSuscriptor: async(req, res)=> {
         //Variables
-        var internet = await isOnline();
         var tipo_doc = req.params.id.slice(0,1);
         var cedula = req.params.id.slice(1,req.params.id.length);
         let datoB = {};
@@ -389,10 +388,8 @@ let controller = {
         infoCNE = await buscarBDAlfa(req.params.id); //BUSCAR LA INFORMACIÓN EN LA BASE DE DATOS (A)
         modo = 'A';
         if(infoCNE.error){ //SI no se encuentra en la base de datos (A)
-            if(internet){ //Si hay Internet
-                modo = 'B';
-                infoCNE = await buscarDBBravo(req.params.id); //BUSCAR LA INFORMACIÓN EN LA BASE DE DATOS (B)
-            }
+            modo = 'B';
+            infoCNE = await buscarDBBravo(req.params.id); //BUSCAR LA INFORMACIÓN EN LA BASE DE DATOS (B)
             if(infoCNE.error){ // Si la BD (B) no tiene la información
                 modo = 'C';
                 infoCNE = await buscarDBCharlie({tipo: tipo_doc, cedula: cedula}); //BUSCAR LA INFORMACIÓN EN LA BASE DE DATOS (C)
@@ -423,7 +420,6 @@ let controller = {
             info.GRADO = infoIPSFA.info.Grado.descripcion;
             info.CATEGORIA = infoIPSFA.info.categoria;
             info.GREMIO = infoIPSFA.info.clase;
-            console.log(info);
             infoFANB.info = info;
             infoFANB.error = false;
         }else{
@@ -455,40 +451,40 @@ let controller = {
         infoINTT.error = true;
         infoINTT.mensaje = "";
         modb = "A";
-        // if(infoINTT.error){//SI no se encuentra en la base de datos interna (A)
-        //     infoINTT = await buscarINTT(datoINTT);
-        //     if(!infoINTT.error){//Si Se encuentra la información On-Line
-        //         modb = "B"
-        //         try{
-        //             var vehiculos_add = [];
-        //             if(infoINTT.vehiculos.length > 0){
-        //                 infoINTT.vehiculos.map((vehiculo)=>{
-        //                     let vh = new vehiculo_intt(vehiculo);
-        //                     vehiculos_add.push(vh)
-        //                 })
-        //             }
-        //             var licencia_add = [];
-        //             if(infoINTT.licencia.length > 0){
-        //                 infoINTT.licencia.map((licencia)=>{
-        //                     let lc = new licencia_intt(licencia);
-        //                     licencia_add.push(lc)
-        //                 })
-        //             }
-        //             var nPersona_intt = {
-        //                 CEDULA: datoINTT.h_identificacion,
-        //                 vehiculos: vehiculos_add,
-        //                 licencias: licencia_add,
-        //                 multas_intt: infoINTT.multasINTT[0].ESTATUS,
-        //                 multas_pnb: infoINTT.multasPNB[0].ESTATUS,
-        //                 creado_por: "test"
-        //             }
-        //             var newPerINTT = new persona_intt(nPersona_intt);
-        //             newPerINTT.save();
-        //         }catch(err){
-        //             console.log(err);
-        //         }
-        //     } 
-        // }
+        if(infoINTT.error){//SI no se encuentra en la base de datos interna (A)
+            infoINTT = await buscarINTT(datoINTT);
+            if(!infoINTT.error){//Si Se encuentra la información On-Line
+                modb = "B"
+                try{
+                    var vehiculos_add = [];
+                    if(infoINTT.vehiculos.length > 0){
+                        infoINTT.vehiculos.map((vehiculo)=>{
+                            let vh = new vehiculo_intt(vehiculo);
+                            vehiculos_add.push(vh)
+                        })
+                    }
+                    var licencia_add = [];
+                    if(infoINTT.licencia.length > 0){
+                        infoINTT.licencia.map((licencia)=>{
+                            let lc = new licencia_intt(licencia);
+                            licencia_add.push(lc)
+                        })
+                    }
+                    var nPersona_intt = {
+                        CEDULA: datoINTT.h_identificacion,
+                        vehiculos: vehiculos_add,
+                        licencias: licencia_add,
+                        multas_intt: infoINTT.multasINTT[0].ESTATUS,
+                        multas_pnb: infoINTT.multasPNB[0].ESTATUS,
+                        creado_por: "test"
+                    }
+                    var newPerINTT = new persona_intt(nPersona_intt);
+                    newPerINTT.save();
+                }catch(err){
+                    console.log(err);
+                }
+            } 
+        }
         
         var respuesta = {};
         var hayCNE = true;
