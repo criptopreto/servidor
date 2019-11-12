@@ -20,7 +20,6 @@ const customMdw = require('./middleware/custom');
 const coordenadas = require('./models/coordenadas');
 const exphbs = require('express-handlebars');
 
-
 /*Inicializacion*/
 const app = express();
 const server = require('http').Server(app);
@@ -75,6 +74,7 @@ app.use(morgan('dev'));
 app.use(bodyParser.json());
 app.use(passport.initialize());
 app.use('/registro', express.static('public'));
+app.use('/control', express.static('public'));
 
 
 //VISTAS
@@ -96,6 +96,7 @@ server.listen(app.get('puerto'), async () => {
 
 const dashboard = io.of('/dashboard'); //Namespace: dashboard
 const suscriptores = io.of('/suscriptores'); //Namespace: suscriptores
+const control = io.of('/control'); //Namespace: Control de los BOT
 
 //###Name espace: dashboard
 const logs = require('./controllers/logs');
@@ -114,6 +115,29 @@ dashboard.on('connection', (socket)=>{
     });
 });
 
+//### | Namespace: control
+control.on('connection', socket=>{
+    console.log("Control: Hay 1 conexión: ", socket.id);
+
+    //Iniciar Sesión SAIME
+    socket.on('iniciar-sesion', ()=>{
+        console.log("Control: Solicitud de inicio de sesión al SAIME recibida");
+        console.log("Enviando comando al BOT");
+        control.emit("control-inicio");
+    });
+
+    socket.on('buscar-cedula', data=>{
+        console.log("Control: Buscar la cédula: ", data);
+        console.log("Enviando comando al BOT");
+        control.emit("control-cedula", data);
+    });
+
+    socket.on('respuesta-cedula', data=>{
+        console.log("Control: Respuesta de la solicitud de información de la cédula.");
+        console.log("Emitiendo información al cliente");
+        control.emit("ctrl-resp-cedula", data);
+    });
+});
 
 //### | Namespace: suscriptores
 suscriptores.on('connection', (socket)=>{    
