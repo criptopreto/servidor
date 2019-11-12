@@ -76,7 +76,6 @@ app.use(passport.initialize());
 app.use('/registro', express.static('public'));
 app.use('/control', express.static('public'));
 
-
 //VISTAS
 app.engine('handlebars', exphbs());
 app.set('view engine', 'handlebars');
