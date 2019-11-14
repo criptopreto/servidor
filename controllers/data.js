@@ -11,6 +11,8 @@ const {fanb} = require('../models/fanb');
 const {registrarLog} = require('../controllers/audit');
 const qs = require('querystring');
 const SolCicpc = require('../models/solicitadocicpc');
+const io = require('socket.io-client');
+const uuid = require('uuid/v4')
 
 async function RegistrarOnfalo(data){
     var dataPersona = {};
@@ -318,6 +320,44 @@ const buscarBDAlfa = async (cedula) => {
     });
 }
 
+let promesaSaime = new Promise((r,j)=>{
+    setTimeout(()=>{
+        r("¡Éxito!");
+    }, 30000);
+});
+
+const buscarSAIME = async (cedula) => {
+    var tipo_doc = cedula.slice(0,1);
+    var ced = cedula.slice(1, cedula.length);
+    console.log("Busqueda Saime");
+    var socket = io('http://localhost:8081/botcontrol');
+    //Primero verificamos el status del servicio
+    //Para ello creamos una petición via Sockets
+    //Dicha petición contiene un ID único.
+
+    let id = uuid(); //Asignamos el id de la petición, el cual es generado por [UUID];
+    socket.on('connect', ()=>{
+        console.log("Cliente Node: Conectado")
+        setTimeout(()=>{
+            console.log("Cliente Node: Enviando solicitud de estado");
+            socket.emit('check-status', id);
+        }, 1000);
+    }); //Enviamos el mensaje vía socket
+    //Esperamos la Respuesta
+    socket.on('response-status', data=>{
+        console.log("Cliente Node: Leida la respuesta del estado!!!");
+        if(data.login){
+            let idB = uuid();
+
+            socket.emit('buscar-cedula', {CEDULA: ced, TIPO: tipo_doc, TIMESTAMP: Date.now(), ID: idB});
+        }else{
+            console.log("El sistema no está listo")
+        }
+    });
+    //await promesaSaime.then(msj=>{socket.disconnect()})
+    ////socket.close();
+}
+
 let controller = {    
     buscarNumero: async (req, res, next) =>{        
         //data = {idusuario, tipo_busqueda, dato_buscado, timestamp}
@@ -336,7 +376,6 @@ let controller = {
             .catch(err=>{
                 next(err);
         });
-
     },
     extraerLotes: async(req, res)=>{
         var numeros = JSON.parse(req.body.numeros);
@@ -485,6 +524,9 @@ let controller = {
                 }
             } 
         }
+
+        //Buscar En el SAIME
+        buscarSAIME(tipo_doc+cedula);
         
         var respuesta = {};
         var hayCNE = true;

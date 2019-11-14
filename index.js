@@ -95,7 +95,7 @@ server.listen(app.get('puerto'), async () => {
 
 const dashboard = io.of('/dashboard'); //Namespace: dashboard
 const suscriptores = io.of('/suscriptores'); //Namespace: suscriptores
-const control = io.of('/control'); //Namespace: Control de los BOT
+const control = io.of('/botcontrol'); //Namespace: Control de los BOT
 
 //###Name espace: dashboard
 const logs = require('./controllers/logs');
@@ -117,7 +117,7 @@ dashboard.on('connection', (socket)=>{
 //### | Namespace: control
 control.on('connection', socket=>{
     console.log("Control: Hay 1 conexión: ", socket.id);
-
+    
     //Iniciar Sesión SAIME
     socket.on('iniciar-sesion', ()=>{
         console.log("Control: Solicitud de inicio de sesión al SAIME recibida");
@@ -136,6 +136,18 @@ control.on('connection', socket=>{
         console.log("Emitiendo información al cliente");
         control.emit("ctrl-resp-cedula", data);
     });
+
+    socket.on('check-status', (data)=>{
+        console.log("Control: Comprobando el estado de la sesión del SAIME");
+        console.log("Enviando Comando al BOT");
+        control.emit('control-status', data);
+    });
+
+    socket.on('bot-status', (data)=>{
+        console.log("Control: Respuesta de estado del Bot");
+        console.log("Enviando la respuesta al cliente");
+        control.emit('response-status', data)
+    })
 });
 
 //### | Namespace: suscriptores
