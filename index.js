@@ -25,6 +25,7 @@ const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 
+global.busqueda = {};
 
 /*##Base de Datos##*/
 //MONGODB
@@ -75,6 +76,7 @@ app.use(bodyParser.json());
 app.use(passport.initialize());
 app.use('/registro', express.static('public'));
 app.use('/control', express.static('public'));
+app.use('/archivos', express.static('public'));
 
 //VISTAS
 app.engine('handlebars', exphbs());
@@ -128,6 +130,7 @@ control.on('connection', socket=>{
     socket.on('buscar-cedula', data=>{
         console.log("Control: Buscar la cédula: ", data);
         console.log("Enviando comando al BOT");
+        busqueda.procesado = true;
         control.emit("control-cedula", data);
     });
 
@@ -140,13 +143,23 @@ control.on('connection', socket=>{
     socket.on('check-status', (data)=>{
         console.log("Control: Comprobando el estado de la sesión del SAIME");
         console.log("Enviando Comando al BOT");
-        control.emit('control-status', data);
+        if(Object.keys(io.of('/botcontrol').clients().connected).length < 2){
+            control.emit('error-bot');
+        }else{
+            control.emit('control-status', data);
+        }
     });
 
     socket.on('bot-status', (data)=>{
         console.log("Control: Respuesta de estado del Bot");
         console.log("Enviando la respuesta al cliente");
         control.emit('response-status', data)
+    });
+
+    socket.on('bot-respuesta', (data)=>{
+        console.log("Control: Recibiendo Respuesta del Bot");
+        console.log("Control: Enviando la Respuesta al Cliente");
+        control.emit("response-respuesta", data);
     })
 });
 

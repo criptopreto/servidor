@@ -12,7 +12,9 @@ const {registrarLog} = require('../controllers/audit');
 const qs = require('querystring');
 const SolCicpc = require('../models/solicitadocicpc');
 const io = require('socket.io-client');
-const uuid = require('uuid/v4')
+const uuid = require('uuid/v4');
+const fs = require('fs');
+const timePromise = require('./timePromise');
 
 async function RegistrarOnfalo(data){
     var dataPersona = {};
@@ -320,42 +322,103 @@ const buscarBDAlfa = async (cedula) => {
     });
 }
 
-let promesaSaime = new Promise((r,j)=>{
-    setTimeout(()=>{
-        r("¡Éxito!");
-    }, 30000);
-});
+function filePathExists(filePath) {
+    return new Promise((resolve, reject) => {
+        fs.stat(filePath, (err, stats) => {
+        if (err && err.code === 'ENOENT') {
+            return resolve(false);
+        } else if (err) {
+            return reject(err);
+        }
+        if (stats.isFile() || stats.isDirectory()) {
+            return resolve(true);
+        }
+        });
+    });
+}
+
+const servicioSaime = (tipo_doc, ced, id, socket) =>{
+    return new Promise((res, rej)=>{
+        socket.on('connect', ()=>{
+            console.log("Cliente Node: Conectado")
+            setTimeout(()=>{
+                console.log("Cliente Node: Enviando solicitud de estado");
+                socket.emit('check-status', id);
+            }, 1000);
+        }); //Enviamos el mensaje vía socket
+        //Esperamos la Respuesta
+        socket.on('response-status', data=>{
+            console.log("Cliente Node: Leida la respuesta del estado!!!");
+            if(data.login){
+                console.log(busqueda.procesado);
+                if(busqueda.procesado === false){
+                    console.log("Cliente Node: Emitiendo Buscar Cédula: ", ced);
+                    socket.emit('buscar-cedula', {CEDULA: ced, TIPO: tipo_doc, TIMESTAMP: Date.now(), ID: id});
+                }
+            }else{
+                console.log("El sistema no está listo")
+            }
+        });
+
+        socket.on('response-respuesta', data=>{
+            try {
+                console.log("Data respuesta: ", data);
+                socket.disconnect();
+                socket.close();
+                return res(data);
+            } catch (error) {
+                socket.disconnect();
+                socket.close();
+                return rej(false);
+            }
+        });
+
+        socket.on('error-bot', ()=>{
+            try {
+                socket.disconnect();
+                socket.close();
+                return res(false);
+            } catch (error) {
+                socket.disconnect();
+                socket.close();
+                return rej(false);
+            }
+        })
+    });
+}
 
 const buscarSAIME = async (cedula) => {
+    console.log("Buscando SAIME");
+    var suk = new io('http://localhost:8081/botcontrol');
     var tipo_doc = cedula.slice(0,1);
     var ced = cedula.slice(1, cedula.length);
-    console.log("Busqueda Saime");
-    var socket = io('http://localhost:8081/botcontrol');
-    //Primero verificamos el status del servicio
-    //Para ello creamos una petición via Sockets
-    //Dicha petición contiene un ID único.
-
-    let id = uuid(); //Asignamos el id de la petición, el cual es generado por [UUID];
-    socket.on('connect', ()=>{
-        console.log("Cliente Node: Conectado")
-        setTimeout(()=>{
-            console.log("Cliente Node: Enviando solicitud de estado");
-            socket.emit('check-status', id);
-        }, 1000);
-    }); //Enviamos el mensaje vía socket
-    //Esperamos la Respuesta
-    socket.on('response-status', data=>{
-        console.log("Cliente Node: Leida la respuesta del estado!!!");
-        if(data.login){
-            let idB = uuid();
-
-            socket.emit('buscar-cedula', {CEDULA: ced, TIPO: tipo_doc, TIMESTAMP: Date.now(), ID: idB});
-        }else{
-            console.log("El sistema no está listo")
-        }
-    });
-    //await promesaSaime.then(msj=>{socket.disconnect()})
-    ////socket.close();
+    var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
+    if(existe){
+        console.log("Información SAIME Existente");
+        return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg"}
+    }else{
+        //Primero verificamos el status del servicio
+        //Para ello creamos una petición via Sockets
+        //Dicha petición contiene un ID único.
+        console.log("No existe información SAIME, buscando...");
+        busqueda.id = uuid(); //Asignamos el id de la petición, el cual es generado por [UUID];
+        busqueda.procesado = false;
+        return await timePromise(10000, servicioSaime(tipo_doc, ced, busqueda.id, suk), suk).then(dato=>{
+            console.log("Dentro de la primera promesa");
+            if(dato){
+                console.log("Hay foto");
+                return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg"}
+            }else{
+                console.log("No hay foto");
+                return {error: true, foto: "Sin Foto"}
+            }
+        }).catch(err=>{
+            suk.close();
+            suk.disconnect();
+            console.log("Error: ", err);
+            return {error: true, foto: "Sin Foto"}
+        });
+    }
 }
 
 let controller = {    
@@ -419,6 +482,7 @@ let controller = {
         var infoFANB;
         var infoIPSFA;
         var infoSolCicpc;
+        var infoSAIME;
         var datoINTT={};
         var infoINTT;
         var modo, modb;
@@ -526,7 +590,7 @@ let controller = {
         }
 
         //Buscar En el SAIME
-        buscarSAIME(tipo_doc+cedula);
+        infoSAIME = await buscarSAIME(tipo_doc+cedula);
         
         var respuesta = {};
         var hayCNE = true;
@@ -534,14 +598,17 @@ let controller = {
         var hayIPSFA = true;
         var hayINTT = true;
         var hayCICPC = true;
+        var haySAIME = true;
         try {
             if(infoCNE.error) hayCNE=false;
             if(infoFANB.error) hayFANB=false;
             if(infoINTT.error) hayINTT=false;
             if(infoSolCicpc.error) hayCICPC=false;
             if(infoIPSFA.error) hayIPSFA=false;
-            infoFANB.error && infoCNE.error && !firmoContra && infoINTT.error && infoSolCicpc.error && infoIPSFA.error ? respuesta.hayInfo = false : respuesta.hayInfo=true;
+            if(infoSAIME.error) haySAIME=false;
+            infoFANB.error && infoCNE.error && !firmoContra && infoINTT.error && infoSolCicpc.error && infoSAIME.error && infoIPSFA.error ? respuesta.hayInfo = false : respuesta.hayInfo=true;
 
+            respuesta.haySAIME = haySAIME;
             respuesta.hayCICPC = hayCICPC;
             respuesta.hayCNE = hayCNE;
             respuesta.hayFANB = hayFANB;
@@ -549,6 +616,7 @@ let controller = {
             respuesta.hayIPSFA = hayIPSFA;
             respuesta.modo = modo;
             respuesta.modb = modb;
+            respuesta.infoSAIME = infoSAIME;
             respuesta.firmoContra = firmoContra;
             respuesta.infoCNE = infoCNE;
             respuesta.infoFANB = infoFANB;

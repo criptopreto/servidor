@@ -39,6 +39,10 @@
             data.login = status;
             socket.emit("bot-status", data);
         }
+
+        function botRespuesta(resp){
+            socket.emit("bot-respuesta", resp)
+        }
     </script>
 </body>
 </html>
