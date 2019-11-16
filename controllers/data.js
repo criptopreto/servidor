@@ -361,27 +361,51 @@ const servicioSaime = (tipo_doc, ced, id, socket) =>{
         });
 
         socket.on('response-respuesta', data=>{
+            var resp = {
+                info: false,
+                foto: false,
+                datos: {
+                    FN: "",
+                    NB: "",
+                    SX: "",
+                    PN: "",
+                    EC: ""
+                }
+            };
             try {
                 console.log("Data respuesta: ", data);
                 socket.disconnect();
                 socket.close();
-                return res(data);
+                data = data.split(";")               
+                resp.info = data[0];
+                resp.foto = data[1];
+                console.log("Foto: ", resp.foto);
+                resp.datos.FN = data[2];
+                resp.datos.NB = data[3];
+                resp.datos.SX = data[4];
+                resp.datos.PN = data[5];
+                resp.datos.EC = data[6];
+                return res(resp);
             } catch (error) {
+                console.log(error)
                 socket.disconnect();
                 socket.close();
-                return rej(false);
+                return rej(resp);
             }
         });
 
         socket.on('error-bot', ()=>{
+            resp = {};
             try {
                 socket.disconnect();
                 socket.close();
-                return res(false);
+                resp.info = false;
+                return res(resp);
             } catch (error) {
                 socket.disconnect();
                 socket.close();
-                return rej(false);
+                resp.info = false;
+                return rej(resp);
             }
         })
     });
@@ -404,13 +428,16 @@ const buscarSAIME = async (cedula) => {
         busqueda.id = uuid(); //Asignamos el id de la petición, el cual es generado por [UUID];
         busqueda.procesado = false;
         return await timePromise(10000, servicioSaime(tipo_doc, ced, busqueda.id, suk), suk).then(dato=>{
-            console.log("Dentro de la primera promesa");
-            if(dato){
-                console.log("Hay foto");
-                return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg"}
+            if(dato.info==="true"){
+                if(dato.foto==="true"){
+                    console.log("Hay foto");
+                    return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: dato.datos}
+                }else{
+                    console.log("No hay foto");
+                    return {error: true, foto: "Sin Foto"}
+                }
             }else{
-                console.log("No hay foto");
-                return {error: true, foto: "Sin Foto"}
+                return {error: true, foto: "Persona no registrada en el SAIME"}
             }
         }).catch(err=>{
             suk.close();
