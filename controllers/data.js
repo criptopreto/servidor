@@ -7,6 +7,7 @@ const axios = require('axios');
 const passport = require('passport');
 const {cne, centros, infocnes} = require('../models/cne');
 const {persona_intt, licencia_intt, vehiculo_intt} = require('../models/intt');
+const {saime} = require('../models/saime');
 const {fanb} = require('../models/fanb');
 const {registrarLog} = require('../controllers/audit');
 const qs = require('querystring');
@@ -15,6 +16,7 @@ const io = require('socket.io-client');
 const uuid = require('uuid/v4');
 const fs = require('fs');
 const timePromise = require('./timePromise');
+const {paises} = require("../models/pais");
 
 async function RegistrarOnfalo(data){
     var dataPersona = {};
@@ -139,6 +141,7 @@ async function buscarSolicitado(dato){
 }
 
 async function buscarDBCharlie (dato){ // C -> Base de datos CNE Offline (versión: 2012)
+    console.log("CNE MODO CHARLIE");
     var resp = {};
     return await cne.findOne({nacionalidad: dato.tipo, cedula: dato.cedula}).then(async (data)=>{
         return await centros.findOne({cod_centro: data.cod_centro}, 'nombre_centro direccion_centro').then(datac=>{
@@ -289,9 +292,12 @@ const buscarINTT = async(dato)=>{
 }
 
 const buscarDBBravo = async(cedula) =>{ // B -> Base de Datos CNE Online (Versión Actual) **Depende de la conexión a internet del Servidor**
+    console.log("CNE MODO BRAVO");
     var tipo_doc = cedula.slice(0,1).toUpperCase();
     var ced = cedula.slice(1,cedula.length); 
+
     return await axios.get(`http://${process.env.HOST_DATAVEN_API}/api/cne/${tipo_doc}${ced}`).then(data=>{
+            console.log("CNE DATA:", data.data)
             if(!data.data.error) return data.data;
             else return {error: true, mensaje: "No encontrado"};
         }).catch(err=>{
@@ -303,6 +309,7 @@ const buscarDBBravo = async(cedula) =>{ // B -> Base de Datos CNE Online (Versi�
 }
 
 const buscarBDAlfa = async (cedula) => {
+    console.log("CNE MODO ALFA");
     var tipo_doc = cedula.slice(0,1);
     var ced = cedula.slice(1,cedula.length);
     var respuesta = {};
@@ -339,6 +346,18 @@ function filePathExists(filePath) {
 
 const servicioSaime = (tipo_doc, ced, id, socket) =>{
     return new Promise((res, rej)=>{
+        var resp = {
+            info: false,
+            foto: false,
+            id: "",
+            datos: {
+                fechaNacimiento: "",
+                nombreCompleto: "",
+                sexo: "",
+                paisNacimiento: "",
+                estadoCivil: ""
+            }
+        };
         socket.on('connect', ()=>{
             console.log("Cliente Node: Conectado")
             setTimeout(()=>{
@@ -349,29 +368,20 @@ const servicioSaime = (tipo_doc, ced, id, socket) =>{
         //Esperamos la Respuesta
         socket.on('response-status', data=>{
             console.log("Cliente Node: Leida la respuesta del estado!!!");
-            if(data.login){
-                console.log(busqueda.procesado);
-                if(busqueda.procesado === false){
-                    console.log("Cliente Node: Emitiendo Buscar Cédula: ", ced);
-                    socket.emit('buscar-cedula', {CEDULA: ced, TIPO: tipo_doc, TIMESTAMP: Date.now(), ID: id});
+            if(data.id === id){
+                if(data.login){
+                    console.log(busqueda.procesado);
+                    if(busqueda.procesado === false){
+                        console.log("Cliente Node: Emitiendo Buscar Cédula: ", ced);
+                        socket.emit('buscar-cedula', {CEDULA: ced, TIPO: tipo_doc, TIMESTAMP: Date.now(), ID: id});
+                    }
+                }else{
+                    console.log("El sistema no está listo")
                 }
-            }else{
-                console.log("El sistema no está listo")
             }
         });
 
         socket.on('response-respuesta', data=>{
-            var resp = {
-                info: false,
-                foto: false,
-                datos: {
-                    FN: "",
-                    NB: "",
-                    SX: "",
-                    PN: "",
-                    EC: ""
-                }
-            };
             try {
                 console.log("Data respuesta: ", data);
                 socket.disconnect();
@@ -380,12 +390,17 @@ const servicioSaime = (tipo_doc, ced, id, socket) =>{
                 resp.info = data[0];
                 resp.foto = data[1];
                 console.log("Foto: ", resp.foto);
-                resp.datos.FN = data[2];
-                resp.datos.NB = data[3];
-                resp.datos.SX = data[4];
-                resp.datos.PN = data[5];
-                resp.datos.EC = data[6];
-                return res(resp);
+                resp.datos.fechaNacimiento = data[2];
+                resp.datos.nombreCompleto = data[3];
+                resp.datos.sexo = data[4];
+                resp.datos.paisNacimiento = data[5];
+                resp.datos.estadoCivil = data[6];
+                resp.id = data[7];
+                console.log("ID Solicitud: ", id);
+                console.log("ID Respuesta: ", resp.id);
+                if(resp.id === id){
+                    return res(resp);
+                }
             } catch (error) {
                 console.log(error)
                 socket.disconnect();
@@ -395,19 +410,42 @@ const servicioSaime = (tipo_doc, ced, id, socket) =>{
         });
 
         socket.on('error-bot', ()=>{
-            resp = {};
             try {
                 socket.disconnect();
                 socket.close();
-                resp.info = false;
                 return res(resp);
             } catch (error) {
                 socket.disconnect();
                 socket.close();
-                resp.info = false;
                 return rej(resp);
             }
         })
+    });
+}
+
+const paisToISO = async (pais)=>{
+    console.log("Buscando ISO: ", pais)
+    return await paises.findOne({NOMBRE: pais}).then(dato=>{
+        if(dato) return dato.ISO.toLowerCase();
+        else return "";
+    }).catch(err=>{
+        return "";
+    });
+}
+
+const buscarSaimeA = async(cedula)=>{
+    console.log("Buscando en el saime Offline: ", cedula);
+    return await saime.findOne({cedula: cedula}).then(async dato=>{
+        console.log(dato);
+        if(dato) {
+            let iso = await paisToISO(dato.paisNacimiento);
+            if(dato.foto){
+                return {error: false, foto: '/archivos/fotos/'+cedula+'.jpg', datos: dato, iso: iso}
+            }else return {error: false, foto: 'Sin Foto', datos: dato, iso: iso}
+        }
+        else return {error: true, datos: {}, iso: ""}
+    }).catch(err=>{
+        return {error: true, datos: {}, iso: ""}
     });
 }
 
@@ -416,36 +454,25 @@ const buscarSAIME = async (cedula) => {
     var suk = new io('http://localhost:8081/botcontrol');
     var tipo_doc = cedula.slice(0,1);
     var ced = cedula.slice(1, cedula.length);
-    var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
-    if(existe){
-        console.log("Información SAIME Existente");
-        return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg"}
-    }else{
-        //Primero verificamos el status del servicio
-        //Para ello creamos una petición via Sockets
-        //Dicha petición contiene un ID único.
-        console.log("No existe información SAIME, buscando...");
-        busqueda.id = uuid(); //Asignamos el id de la petición, el cual es generado por [UUID];
-        busqueda.procesado = false;
-        return await timePromise(10000, servicioSaime(tipo_doc, ced, busqueda.id, suk), suk).then(dato=>{
-            if(dato.info==="true"){
-                if(dato.foto==="true"){
-                    console.log("Hay foto");
-                    return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: dato.datos}
-                }else{
-                    console.log("No hay foto");
-                    return {error: true, foto: "Sin Foto"}
-                }
+    busqueda.id = uuid(); //Asignamos el id de la petición, el cual es generado por [UUID];
+    busqueda.procesado = false;
+    return await timePromise(20000, servicioSaime(tipo_doc, ced, busqueda.id, suk), suk).then(async dato=>{
+        let iso = await paisToISO(dato.datos.paisNacimiento);
+        if(dato.info==="true"){
+            if(dato.foto==="true"){
+                return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: dato.datos, iso: iso}
             }else{
-                return {error: true, foto: "Persona no registrada en el SAIME"}
+                return {error: false, foto: "Sin Foto", datos: dato.datos, iso: iso}
             }
-        }).catch(err=>{
-            suk.close();
-            suk.disconnect();
-            console.log("Error: ", err);
-            return {error: true, foto: "Sin Foto"}
-        });
-    }
+        }else{
+            return {error: true, foto: "Persona no registrada en el SAIME", iso: ""}
+        }
+    }).catch(err=>{
+        suk.close();
+        suk.disconnect();
+        console.log("Error: ", err);
+        return {error: true, foto: "Sin Foto", iso: ""}
+    });
 }
 
 let controller = {    
@@ -515,6 +542,7 @@ let controller = {
         var modo, modb;
         //############# BUSCAR INFORMACIÓN DEL CNE ###############
         //Estrategia ABC || A -> BASE DE DATOS OFFLINE ACTUAL || B -> BASE DE DATOS ONLINE ACTUAL || C -> BASE DE DATOS OFFLINE 2012        
+        console.log("Buscando CNE");
         infoCNE = await buscarBDAlfa(req.params.id); //BUSCAR LA INFORMACIÓN EN LA BASE DE DATOS (A)
         modo = 'A';
         if(infoCNE.error){ //SI no se encuentra en la base de datos (A)
@@ -536,9 +564,11 @@ let controller = {
         //Buscar si está solicitado     
         datoB.cod = tipo_doc;
         datoB.cedula = cedula;   
+        console.log("Buscando Solicitados CICPC Offline")
         infoSolCicpc = await buscarSolicitado(datoB);
 
         //Buscar en el Ipsfa Online
+        console.log("Buscando En el IPSFA")
         infoIPSFA = await buscarIpsfa(cedula);
         if(!infoIPSFA.error){
             infoFANB = {};
@@ -581,6 +611,7 @@ let controller = {
         infoINTT.error = true;
         infoINTT.mensaje = "";
         modb = "A";
+        console.log("Buscando en el INTT")
         if(infoINTT.error){//SI no se encuentra en la base de datos interna (A)
             infoINTT = await buscarINTT(datoINTT);
             if(!infoINTT.error){//Si Se encuentra la información On-Line
@@ -617,7 +648,24 @@ let controller = {
         }
 
         //Buscar En el SAIME
-        infoSAIME = await buscarSAIME(tipo_doc+cedula);
+        //Método A-B (A->Offline | B->Online)
+        infoSAIME = await buscarSaimeA(tipo_doc+cedula);
+        if(infoSAIME.error){
+            infoSAIME = await buscarSAIME(tipo_doc+cedula);
+            if(!infoSAIME.error){
+                var nuevoSaime = {};
+                nuevoSaime.cedula = tipo_doc+cedula;
+                nuevoSaime.nombreCompleto = infoSAIME.datos.nombreCompleto;
+                nuevoSaime.fechaNacimiento = infoSAIME.datos.fechaNacimiento;
+                nuevoSaime.paisNacimiento = infoSAIME.datos.paisNacimiento;
+                nuevoSaime.sexo = infoSAIME.datos.sexo;
+                nuevoSaime.estadoCivil = infoSAIME.datos.estadoCivil;
+                if(infoSAIME.foto !== "Sin Foto")nuevoSaime.foto = true;
+                else nuevoSaime.foto = false;
+                var newSaime = new saime(nuevoSaime);
+                newSaime.save();
+            }
+        }
         
         var respuesta = {};
         var hayCNE = true;
