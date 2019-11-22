@@ -519,12 +519,12 @@ let controller = {
         dataLog.dato_buscado = req.params.id;
         await registrarLog(dataLog);
         await Suscriptor.find({CEDULA: req.params.id}).limit(50)
-            .then(data=> {
-                res.json({data});
-                })
-            .catch(err=>{ 
-                next(err);
-            });
+        .then(data=> {
+            res.json({data});
+            })
+        .catch(err=>{ 
+            next(err);
+        });
     },
     buscarInfoSuscriptor: async(req, res)=> {
         //Variables
@@ -537,9 +537,12 @@ let controller = {
         var infoIPSFA;
         var infoSolCicpc;
         var infoSAIME;
+        var infoTelefono;
         var datoINTT={};
         var infoINTT;
         var modo, modb;
+        var esEmpresa = (tipo_doc === 'J' || tipo_doc === 'G')
+
         //############# BUSCAR INFORMACIÓN DEL CNE ###############
         //Estrategia ABC || A -> BASE DE DATOS OFFLINE ACTUAL || B -> BASE DE DATOS ONLINE ACTUAL || C -> BASE DE DATOS OFFLINE 2012        
         console.log("Buscando CNE");
@@ -666,6 +669,21 @@ let controller = {
                 newSaime.save();
             }
         }
+
+        //Buscar Números a su Nombre.
+        console.log(req.params.id);
+        infoTelefono = await Suscriptor.find({CEDULA: req.params.id}).limit(50)
+        .then(data=> {
+            console.log(data);
+            if(!data){
+                return {error: true, data: []};
+            }else{
+                return {error: false, data: data};
+            }
+        })
+        .catch(()=>{ 
+            return {error: true, data: []};
+        });
         
         var respuesta = {};
         var hayCNE = true;
@@ -674,6 +692,7 @@ let controller = {
         var hayINTT = true;
         var hayCICPC = true;
         var haySAIME = true;
+        var hayTelefono = true;
         try {
             if(infoCNE.error) hayCNE=false;
             if(infoFANB.error) hayFANB=false;
@@ -681,14 +700,16 @@ let controller = {
             if(infoSolCicpc.error) hayCICPC=false;
             if(infoIPSFA.error) hayIPSFA=false;
             if(infoSAIME.error) haySAIME=false;
-            infoFANB.error && infoCNE.error && !firmoContra && infoINTT.error && infoSolCicpc.error && infoSAIME.error && infoIPSFA.error ? respuesta.hayInfo = false : respuesta.hayInfo=true;
+            if(infoTelefono.error) hayTelefono=false;
+            infoFANB.error && infoCNE.error && !firmoContra && infoINTT.error && infoSolCicpc.error && infoSAIME.error && infoIPSFA.error && infoTelefono.error ? respuesta.hayInfo = false : respuesta.hayInfo=true;
 
-            respuesta.haySAIME = haySAIME;
-            respuesta.hayCICPC = hayCICPC;
-            respuesta.hayCNE = hayCNE;
-            respuesta.hayFANB = hayFANB;
-            respuesta.hayINTT = hayINTT;
-            respuesta.hayIPSFA = hayIPSFA;
+            respuesta.hayTelefono=hayTelefono;
+            respuesta.haySAIME=haySAIME;
+            respuesta.hayCICPC=hayCICPC;
+            respuesta.hayCNE=hayCNE;
+            respuesta.hayFANB=hayFANB;
+            respuesta.hayINTT=hayINTT;
+            respuesta.hayIPSFA=hayIPSFA;
             respuesta.modo = modo;
             respuesta.modb = modb;
             respuesta.infoSAIME = infoSAIME;
@@ -698,6 +719,7 @@ let controller = {
             respuesta.infoINTT = infoINTT;
             respuesta.infoIPSFA = infoIPSFA;
             respuesta.infoCICPC = infoSolCicpc;
+            respuesta.infoTelefono = infoTelefono;
             res.json(respuesta);
         } catch (error) {
             console.log("Error: ", error);
