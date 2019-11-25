@@ -451,6 +451,8 @@ const saimeTest = async (cedula)=>{
     }
 
     return resp;
+}
+
 const paisToISO = async (pais)=>{
     console.log("Buscando ISO: ", pais)
     return await paises.findOne({NOMBRE: pais}).then(dato=>{
