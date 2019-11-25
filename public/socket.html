@@ -34,9 +34,11 @@
         })
 
         function botStatus(status) {
-            document.getElementById("log").innerHTML &= "\n" + status;
+            var resp = status.split(";");
+
             var data = {};
-            data.login = status;
+            data.login = (resp[0].toLowerCase() === 'true');
+            data.id = resp[1];
             socket.emit("bot-status", data);
         }
 
