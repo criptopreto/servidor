@@ -165,6 +165,8 @@ async function buscarDBCharlie (dato){ // C -> Base de datos CNE Offline (versiÃ
 async function buscarIpsfa(cedula){
     var resp = {};
     return await axios.get(`http://${process.env.HOST_DATAVEN_API}/api/ipsfa/${cedula}`).then(datos=>{
+        console.log(process.env.HOST_DATAVEN_API)
+        console.log(cedula);
         if(datos.data){
             if(!datos.data.error){
                 resp.error = false;
@@ -292,14 +294,14 @@ const buscarDBBravo = async(cedula) =>{ // B -> Base de Datos CNE Online (VersiÃ
     var tipo_doc = cedula.slice(0,1).toUpperCase();
     var ced = cedula.slice(1,cedula.length); 
     return await axios.get(`http://${process.env.HOST_DATAVEN_API}/api/cne/${tipo_doc}${ced}`).then(data=>{
-            if(!data.data.error) return data.data;
-            else return {error: true, mensaje: "No encontrado"};
-        }).catch(err=>{
-            const respuesta = {};
-            respuesta.error = true;
-            respuesta.mensaje = err;
-            return respuesta;
-        });
+        if(!data.data.error) return data.data;
+        else return {error: true, mensaje: "No encontrado"};
+    }).catch(err=>{
+        const respuesta = {};
+        respuesta.error = true;
+        respuesta.mensaje = err;
+        return respuesta;
+    });
 }
 
 const buscarBDAlfa = async (cedula) => {
@@ -411,14 +413,65 @@ const servicioSaime = (tipo_doc, ced, id, socket) =>{
     });
 }
 
+const saimeTest = async (cedula)=>{
+    var resp = {};
+    const registro = [
+        {CI: "V6210921", FN: "11/11/1966", NB: "Asuncion Jesus Campos Tovar", SX: "M", PN: "Venezuela", EC: "Soltero"},
+        {CI: "V6493194", FN: "11/07/1946", NB: "Elisabeth Sequera", SX: "F", PN: "Venezuela", EC: "Soltera"},
+        {CI: "V5054672", FN: "15/08/1949", NB: "Dennys Daniel Alvarado Morillo", SX: "M", PN: "Venezuela", EC: "Soltero"},
+        {CI: "V9380614", FN: "11/12/1965", NB: "Atef Salami Nemer Hirchedd", SX: "M", PN: "Siria", EC: "Soltero"},
+        {CI: "V10416832", FN: "24/12/1975", NB: "Zaida Beatriz Canaan Diaz", SX: "F", PN: "Venezuela", EC: "Soltero"},
+        {CI: "V22940777", FN: "15/15/1993", NB: "Abelardo Jesus Martinez Peniche", SX: "M", PN: "Venezuela", EC: "Soltero"},
+        {CI: "V20995685", FN: "05/02/1991", NB: "Rosmer Jesus Campos Peroza", SX: "M", PN: "Venezuela", EC: "Soltero"},
+        {CI: "V11639426", FN: "11/07/1969", NB: "Zoveida del Carmen Peroza Tortoza", SX: "F", PN: "Venezuela", EC: "Soltera"},
+    ]
+
+    await registro.map((persona, key)=>{
+        if(persona.CI === cedula){
+            resp.error = false;
+            resp.data = persona;
+            resp.key = key;
+        }
+    });
+
+    if(resp.data === undefined){
+        resp.error = true;
+        resp.data = {}
+    }
+
+    return resp;
+}
+
 const buscarSAIME = async (cedula) => {
-    console.log("Buscando SAIME");
-    var suk = new io('http://localhost:8081/botcontrol');
     var tipo_doc = cedula.slice(0,1);
     var ced = cedula.slice(1, cedula.length);
+    console.log("Buscando SAIME");
+    if(process.env.TEST_SAIME){
+        var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
+        if(!existe){
+            var registro = await saimeTest(cedula);
+            if (!registro.error){
+                return {error: false, hayFoto: false, foto: 'Sin Foto', datos: registro.data}
+            }else{
+                return {error: true, hayFoto: false, foto: 'Sin Foto', datos: {}}
+            }
+            
+        }else{
+            var registro = await saimeTest(cedula);
+            if (!registro.error){
+                return {error: false, hayFoto: true, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: registro.data}
+            }else{
+                return {error: false, hayFoto: true, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: {}}
+            }
+        }
+    }
+    var suk = new io('http://localhost:8081/botcontrol');
+    
     var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
     if(existe){
         console.log("InformaciÃ³n SAIME Existente");
+        suk.close();
+        suk.disconnect();
         return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg"}
     }else{
         //Primero verificamos el status del servicio
@@ -431,10 +484,10 @@ const buscarSAIME = async (cedula) => {
             if(dato.info==="true"){
                 if(dato.foto==="true"){
                     console.log("Hay foto");
-                    return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: dato.datos}
+                    return {error: false, hayFoto: true, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: dato.datos}
                 }else{
                     console.log("No hay foto");
-                    return {error: true, foto: "Sin Foto"}
+                    return {error: true, hayFoto: false, foto: "Sin Foto", datos: dato.datos}
                 }
             }else{
                 return {error: true, foto: "Persona no registrada en el SAIME"}
