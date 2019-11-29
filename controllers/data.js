@@ -523,21 +523,18 @@ const buscarSAIME = async (cedula) => {
                     console.log("Hay foto");
                     return {error: false, hayFoto: true, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: dato.datos}
                 }else{
-                    console.log("No hay foto");
-                    return {error: true, hayFoto: false, foto: "Sin Foto", datos: dato.datos}
+                    return {error: false, foto: "Sin Foto", datos: dato.datos, iso: iso}
                 }
             }else{
-                return {error: false, foto: "Sin Foto", datos: dato.datos, iso: iso}
+                return {error: true, foto: "Persona no registrada en el SAIME", iso: ""}
             }
-        }else{
-            return {error: true, foto: "Persona no registrada en el SAIME", iso: ""}
-        }
     }).catch(err=>{
         suk.close();
         suk.disconnect();
         console.log("Error: ", err);
         return {error: true, foto: "Sin Foto", iso: ""}
     });
+}
 }
 
 let controller = {    

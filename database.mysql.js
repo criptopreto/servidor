@@ -1,10 +1,10 @@
 var mysql = require('mysql');
 var pool = mysql.createPool({
     connectionLimit: 150,
-    host: '10.51.13.180',
-    user: 'root',
-    password: 'SPDT2019*-',
-    database: 'dataven',
+    host: process.env.DB_MYSQL_HOST,
+    user: process.env.DB_MYSQL_USER,
+    password: process.env.DB_MYSQL_PASS,
+    database: process.env.DB_MYSQL_DATABASE,
     debug: false
 });
 

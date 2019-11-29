@@ -19,6 +19,7 @@ const data_routes = require('./routes/data');
 const customMdw = require('./middleware/custom');
 const coordenadas = require('./models/coordenadas');
 const exphbs = require('express-handlebars');
+const user = require('./models/user');
 
 /*Inicializacion*/
 const app = express();
@@ -45,13 +46,20 @@ passport.use(new LocalStrategy({
     passwordField: "password",
     session: false
 }, (username, password, done)=>{
-    pool.query("Select * from usuario where username='" + username + "'", (err, result)=>{
-        if(err) return done(err, null);
-        if(!result) return done(null,false);
-        if(result.length <= 0) return done(null, false); //El usuario no existe
-        else if (!bcrypt.compareSync(password, result[0].password)){return done(null, false)} //contraseña incorrecta
-        return done(null, result[0]) //Login Ok
-    });
+    user.findOne({username: username}).then(usuario=>{
+        if(!usuario) return done(null,false);
+        else if(!bcrypt.compareSync(password, usuario.password)){return done(null, false)};
+        return done(null, usuario);
+    }).catch(err=>{
+        return done(err, false);
+    })
+    // pool.query("Select * from usuario where username='" + username + "'", (err, result)=>{
+    //     if(err) return done(err, null);
+    //     if(!result) return done(null,false);
+    //     if(result.length <= 0) return done(null, false); //El usuario no existe
+    //     else if (!bcrypt.compareSync(password, result[0].password)){return done(null, false)} //contraseña incorrecta
+    //     return done(null, result[0]) //Login Ok
+    // });
 }));
 
 let opts = {};
@@ -60,11 +68,17 @@ opts.secretOrKey = process.env.JWT_SECRET;
 opts.algorithms = [process.env.JWT_ALGORITHMS];
 
 passport.use(new JwtStrategy(opts, (jwt_payload, done)=>{
-    pool.query("Select * from usuario where idusuario='" + jwt_payload.sub + "'", (err, usuario) => {
-        if(err) return done(err, null) //Error en la bd
-        if(usuario.length <=0) return done(null, false) //Usuario no encontrado
-        return done(null, usuario[0]);
+    user.findById(jwt_payload.sub).then(usuario=>{
+        if(!usuario) return done(null, false);
+        else return done(null, usuario);
+    }).catch(err=>{
+        return done(err, false);
     })
+    // pool.query("Select * from usuario where idusuario='" + jwt_payload.sub + "'", (err, usuario) => {
+    //     if(err) return done(err, null) //Error en la bd
+    //     if(usuario.length <=0) return done(null, false) //Usuario no encontrado
+    //     return done(null, usuario[0]);
+    // })
 }));
 
 /*Middlewares*/
