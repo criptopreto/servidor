@@ -1,5 +1,4 @@
 'use strict'
-
 const Suscriptor = require('../models/suscriptores');
 const Firma = require('../models/firma');
 const Bts = require('../models/bts');
@@ -9,7 +8,7 @@ const {cne, centros, infocnes} = require('../models/cne');
 const {persona_intt, licencia_intt, vehiculo_intt} = require('../models/intt');
 const {saime} = require('../models/saime');
 const {fanb} = require('../models/fanb');
-const {registrarLog} = require('../controllers/audit');
+const {registrarLog} = require('./audit');
 const qs = require('querystring');
 const SolCicpc = require('../models/solicitadocicpc');
 const io = require('socket.io-client');
@@ -17,6 +16,11 @@ const uuid = require('uuid/v4');
 const fs = require('fs');
 const timePromise = require('./timePromise');
 const {paises} = require("../models/pais");
+//Conexión con la Base de Datos de SQL Server
+var Connection = require('tedious').Connection;
+var Request = require('tedious').Request;
+const configMSSQL = require('../database.sqlserver');
+const jsonSql = require('json-sql')({dialect: 'mssql'});
 
 async function RegistrarOnfalo(data){
     var dataPersona = {};
@@ -36,6 +40,51 @@ async function RegistrarOnfalo(data){
         dataPersona.nombres = data.dataCNE.nombres;
         dataPersona.apellidos = data.dataCNE.apellidos;    
     }
+}
+
+function execStat(sql) {
+    let result = {
+        error: null,
+        res: {}
+    }
+    return new Promise((res, rej)=>{
+        var conexion = new Connection(configMSSQL);
+        
+        conexion.on('connect', err=>{
+            if(err){
+                result.error = err;
+                conexion.close();
+                rej(result);
+            }else{
+                console.log("Conectó")
+                let req = new Request(sql, (err, rowCount, rows)=>{
+                    if(err){
+                        result.error = err;
+                        rej(result);
+                    }else{
+                        result.res = rows;
+                        res(result);
+                    }
+
+                    conexion.close();
+                });
+                conexion.execSql(req);
+            }
+        });
+    })
+}
+
+async function LeerPersona(){
+    let sql = jsonSql.build({
+        type: 'select',
+        table: 'dbo.Nominal_'
+    });
+    console.log(sql.query);
+    return await execStat(sql.query).then((data)=>{
+        return data;
+    }).catch(err=>{
+        return err;
+    });
 }
 
 async function buscarBTS(data) {
@@ -483,7 +532,7 @@ const buscarSAIME = async (cedula) => {
     var tipo_doc = cedula.slice(0,1);
     var ced = cedula.slice(1, cedula.length);
     console.log("Buscando SAIME");
-    if(process.env.TEST_SAIME){
+    if(process.env.TEST_SAIME === "DEV"){
         var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
         if(!existe){
             var registro = await saimeTest(cedula);
@@ -517,11 +566,12 @@ const buscarSAIME = async (cedula) => {
         console.log("No existe información SAIME, buscando...");
         busqueda.id = uuid(); //Asignamos el id de la petición, el cual es generado por [UUID];
         busqueda.procesado = false;
-        return await timePromise(10000, servicioSaime(tipo_doc, ced, busqueda.id, suk), suk).then(dato=>{
+        return await timePromise(10000, servicioSaime(tipo_doc, ced, busqueda.id, suk), suk).then(async dato=>{
             if(dato.info==="true"){
+                let iso = await paisToISO(dato.datos.paisNacimiento);
+                console.log("Pais ISO", iso)
                 if(dato.foto==="true"){
-                    console.log("Hay foto");
-                    return {error: false, hayFoto: true, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: dato.datos}
+                    return {error: false, hayFoto: true, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: dato.datos, iso: iso}
                 }else{
                     return {error: false, foto: "Sin Foto", datos: dato.datos, iso: iso}
                 }
@@ -746,6 +796,10 @@ let controller = {
         .catch(()=>{ 
             return {error: true, data: []};
         });
+
+        //Verificamos las personas iBase
+        var personas = await LeerPersona();
+        console.log(personas);
         
         var respuesta = {};
         var hayCNE = true;

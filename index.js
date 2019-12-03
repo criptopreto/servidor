@@ -46,20 +46,26 @@ passport.use(new LocalStrategy({
     passwordField: "password",
     session: false
 }, (username, password, done)=>{
-    user.findOne({username: username}).then(usuario=>{
-        if(!usuario) return done(null,false);
-        else if(!bcrypt.compareSync(password, usuario.password)){return done(null, false)};
-        return done(null, usuario);
-    }).catch(err=>{
-        return done(err, false);
-    })
-    // pool.query("Select * from usuario where username='" + username + "'", (err, result)=>{
-    //     if(err) return done(err, null);
-    //     if(!result) return done(null,false);
-    //     if(result.length <= 0) return done(null, false); //El usuario no existe
-    //     else if (!bcrypt.compareSync(password, result[0].password)){return done(null, false)} //contraseña incorrecta
-    //     return done(null, result[0]) //Login Ok
-    // });
+    console.log(process.env.DB_USERS)
+    if(process.env.DB_USERS === "MONGODB"){
+        console.log("Inicio Sesion MongoDB");
+        user.findOne({username: username}).then(usuario=>{
+            if(!usuario) return done(null,false);
+            else if(!bcrypt.compareSync(password, usuario.password)){return done(null, false)};
+            return done(null, usuario);
+        }).catch(err=>{
+            return done(err, false);
+        })
+    }else{
+        console.log("Inicio Sesion Mysql");
+        pool.query("Select * from usuario where username='" + username + "'", (err, result)=>{
+            if(err) return done(err, null);
+            if(!result) return done(null,false);
+            if(result.length <= 0) return done(null, false); //El usuario no existe
+            else if (!bcrypt.compareSync(password, result[0].password)){return done(null, false)} //contraseña incorrecta
+            return done(null, result[0]) //Login Ok
+        });
+    }
 }));
 
 let opts = {};
@@ -68,17 +74,25 @@ opts.secretOrKey = process.env.JWT_SECRET;
 opts.algorithms = [process.env.JWT_ALGORITHMS];
 
 passport.use(new JwtStrategy(opts, (jwt_payload, done)=>{
-    user.findById(jwt_payload.sub).then(usuario=>{
-        if(!usuario) return done(null, false);
-        else return done(null, usuario);
-    }).catch(err=>{
-        return done(err, false);
-    })
-    // pool.query("Select * from usuario where idusuario='" + jwt_payload.sub + "'", (err, usuario) => {
-    //     if(err) return done(err, null) //Error en la bd
-    //     if(usuario.length <=0) return done(null, false) //Usuario no encontrado
-    //     return done(null, usuario[0]);
-    // })
+    console.log("ENV:", process.env.DB_USERS)
+    if(process.env.DB_USERS === "MONGODB"){
+        console.log("Inicio Sesion MongoDB");
+        user.findById(jwt_payload.sub).then(usuario=>{
+            if(!usuario) return done(null, false);
+            else return done(null, usuario);
+        }).catch(err=>{
+            return done(err, false);
+        })
+    }else{
+        console.log("Estrategia MySQL");
+        pool.query("Select * from usuario where idusuario='" + jwt_payload.sub + "'", (err, usuario) => {
+            console.log("Error Mysql: ", err);
+            console.log("Usuario Mysql:", usuario);
+            if(err) return done(err, null) //Error en la bd
+            if(usuario.length <=0) return done(null, false) //Usuario no encontrado
+            return done(null, usuario[0]);
+        })
+    }
 }));
 
 /*Middlewares*/
@@ -108,7 +122,6 @@ server.listen(app.get('puerto'), async () => {
 });
 
 /* Socket.io */
-
 const dashboard = io.of('/dashboard'); //Namespace: dashboard
 const suscriptores = io.of('/suscriptores'); //Namespace: suscriptores
 const control = io.of('/botcontrol'); //Namespace: Control de los BOT
