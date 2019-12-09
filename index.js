@@ -20,6 +20,13 @@ const customMdw = require('./middleware/custom');
 const coordenadas = require('./models/coordenadas');
 const exphbs = require('express-handlebars');
 const user = require('./models/user');
+const Twitter = require('twitter');
+const clienteTwitter = new Twitter({
+    consumer_key: 'UmIdP6yvPw0Omws5MZudoRCOC',
+    consumer_secret: 'ORlE8vYGQ016KgDroxmfKTu4Jo4Si5kxLfyWiP6s0pqfxptK7E',
+    access_token_key: '134216804-bMXosyVoHbAo8mHM1L0ER5M18Gx9RuC6vCFaWgdQ',
+    access_token_secret: 'e6qBHX3c6x3vHj9Wd9mmcPWgZ2CuRCyCbNGT6CO0Qv1Dc'
+});
 
 /*Inicializacion*/
 const app = express();
@@ -128,6 +135,13 @@ const control = io.of('/botcontrol'); //Namespace: Control de los BOT
 
 //###Name espace: dashboard
 const logs = require('./controllers/logs');
+
+var stream = clienteTwitter.stream('statuses/filter', {track: 'guaido, venezuela'});
+
+stream.on('data', (evento)=>{
+    dashboard.emit("twitter", evento.text);
+});
+
 dashboard.on('connection', (socket)=>{
     console.log('(B)Hay 1 conexión: ', socket.id);
     socket.on('enviar-data', datos=>{
