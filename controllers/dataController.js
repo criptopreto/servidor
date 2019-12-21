@@ -21,6 +21,7 @@ var Connection = require('tedious').Connection;
 var Request = require('tedious').Request;
 const configMSSQL = require('../database.sqlserver');
 const jsonSql = require('json-sql')({dialect: 'mssql'});
+const co = require('co');
 
 async function RegistrarOnfalo(data){
     var dataPersona = {};
@@ -586,7 +587,7 @@ const buscarSAIME = async (cedula) => {
 }
 }
 
-const buscarCNENombres = async(datos)=>{
+const buscarCNENombres = co.wrap(function* (datos){
     if(datos.PN === "" && datos.SN === "" && datos.PA === "" && datos.SA === ""){
         return [];
     }
@@ -594,61 +595,127 @@ const buscarCNENombres = async(datos)=>{
     let erSN = new RegExp("^" + datos.SN);
     let erPA = new RegExp("^" + datos.PA);
     let erSA = new RegExp("^" + datos.SA);
+    let personas = [];
 
-    return await cne.find({primer_nombre: erPN, segundo_nombre: erSN, primer_apellido: erPA, segundo_apellido: erSA}).limit(100).then(result=>{
-        if(result.length > 0) return result;
-        else return [];
-    }).catch(err=>{
-        console.log(err);
+    const cursor = cne.find({primer_nombre: erPN, segundo_nombre: erSN, primer_apellido: erPA, segundo_apellido: erSA}).cursor();
+    for (let doc = yield cursor.next(); doc != null; doc = yield cursor.next()){
+        personas.push(doc);
+    }
+    return personas;
+
+    // return await cne.find({primer_nombre: erPN, segundo_nombre: erSN, primer_apellido: erPA, segundo_apellido: erSA}).cursor().on('data', (persona)=>{
+    //     personas.push(persona);
+    // }).on('end', ()=>{
+    //     return personas;
+    // });
+});
+
+const buscarCNECedula = async(datos)=>{
+    if(datos.N === "" && datos.C===""){
+        return [];
+    }
+    return await cne.find({nacionalidad: datos.N, cedula: datos.C}).then(result=>{
+        return result
+    }).catch(()=>{
         return [];
     });
-};
+}
 
 
 let controller = {    
+    buscarPersonaID: async(req, res)=>{
+        let datos = {};
+        try {
+            datos.N = req.query.CI.slice(0,1);
+            datos.C = req.query.CI.slice(1,req.query.CI.length)
+            let personas = await buscarCNECedula(datos);
+            let cedulas = [];
+            for(let i=0;i<personas.length;i++){
+                cedulas.push(personas[i].cedula);
+            }
+            //Buscar información Militar
+            let infoMilitar = await fanb.find({CEDULA: {$in: cedulas}}).then(militares=>{
+                if(militares.length>0){
+                    return militares;
+                }else{
+                    return [];
+                }
+            }).catch(err=>{
+                return [];
+            });
+            //Buscar Fotos Saime guardadas
+            for(let i =0;i < personas.length; i++){
+                let tipo_doc = personas[i].nacionalidad.toUpperCase();
+                let ced = personas[i].cedula;
+                var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
+                let militar;
+                //Militar
+                infoMilitar.findIndex(i=>{
+                    if(JSON.parse(JSON.stringify(i)).CEDULA===ced){
+                        militar = JSON.parse(JSON.stringify(i));
+                    }
+                });
+                if(existe){
+                    let newPersona = Object.assign({}, personas[i], {foto: true});
+                    personas.splice(i, 1, newPersona);
+                }
+                if(militar){
+                    let newMilitar = Object.assign({}, personas[i], {militar: true}, militar);
+                    personas.splice(i, 1, newMilitar);
+                }
+            }
+            res.json(personas);
+        } catch (error) {
+            console.log(error)
+            res.json([])
+        }
+    },
     buscarPersonaNombres: async(req, res)=>{
         let datos = {};
         datos.PN = req.query.PN;
         datos.PA = req.query.PA;
         datos.SN = req.query.SN;
         datos.SA = req.query.SA;
-        let personas = await buscarCNENombres(datos);
-        let cedulas = [];
-        for(let i=0;i<personas.length;i++){
-            cedulas.push(personas[i].cedula);
-        }
-        //Buscar información Militar
-        let infoMilitar = await fanb.find({CEDULA: {$in: cedulas}}).then(militares=>{
-            if(militares.length>0){
-                return militares;
-            }else{
-                return [];
+        buscarCNENombres(datos).then(async personas=>{
+            let cedulas = [];
+            for(let i=0;i<personas.length;i++){
+                cedulas.push(personas[i].cedula);
             }
-        }).catch(err=>{
-            return [];
-        });
-        //Buscar Fotos Saime guardadas
-        for(let i =0;i < personas.length; i++){
-            let tipo_doc = personas[i].nacionalidad.toUpperCase();
-            let ced = personas[i].cedula;
-            var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
-            let militar;
-            //Militar
-            infoMilitar.findIndex(i=>{
-                if(JSON.parse(JSON.stringify(i)).CEDULA===ced){
-                    militar = JSON.parse(JSON.stringify(i));
+            //Buscar información Militar
+            let infoMilitar = await fanb.find({CEDULA: {$in: cedulas}}).then(militares=>{
+                if(militares.length>0){
+                    return militares;
+                }else{
+                    return [];
                 }
+            }).catch(err=>{
+                return [];
             });
-            if(existe){
-                let newPersona = Object.assign({}, personas[i], {foto: true});
-                personas.splice(i, 1, newPersona);
+            //Buscar Fotos Saime guardadas
+            for(let i =0;i < personas.length; i++){
+                let tipo_doc = personas[i].nacionalidad.toUpperCase();
+                let ced = personas[i].cedula;
+                var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
+                let militar;
+                //Militar
+                infoMilitar.findIndex(i=>{
+                    if(JSON.parse(JSON.stringify(i)).CEDULA===ced){
+                        militar = JSON.parse(JSON.stringify(i));
+                    }
+                });
+                if(existe){
+                    let newPersona = Object.assign({}, personas[i], {foto: true});
+                    personas.splice(i, 1, newPersona);
+                }
+                if(militar){
+                    let newMilitar = Object.assign({}, personas[i], {militar: true}, militar);
+                    personas.splice(i, 1, newMilitar);
+                }
             }
-            if(militar){
-                let newMilitar = Object.assign({}, personas[i], {militar: true}, militar);
-                personas.splice(i, 1, newMilitar);
-            }
-        }
-        res.json(personas);
+            res.json(personas);
+        }).catch(()=>{
+            res.json([]);
+        });
     },
     buscarNumero: async (req, res, next) =>{
         //data = {idusuario, tipo_busqueda, dato_buscado, timestamp}

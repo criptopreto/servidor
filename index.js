@@ -136,11 +136,11 @@ const control = io.of('/botcontrol'); //Namespace: Control de los BOT
 //###Name espace: dashboard
 const logs = require('./controllers/logs');
 
-var stream = clienteTwitter.stream('statuses/filter', {track: 'guaido, venezuela'});
+// var stream = clienteTwitter.stream('statuses/filter', {track: 'guaido, venezuela'});
 
-stream.on('data', (evento)=>{
-    dashboard.emit("twitter", evento.text);
-});
+// stream.on('data', (evento)=>{
+//     dashboard.emit("twitter", evento.text);
+// });
 
 dashboard.on('connection', (socket)=>{
     console.log('(B)Hay 1 conexión: ', socket.id);
