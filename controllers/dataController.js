@@ -556,10 +556,42 @@ const buscarSAIME = async (cedula) => {
     
     var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
     if(existe){
-        console.log("Información SAIME Existente");
-        suk.close();
-        suk.disconnect();
-        return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg"}
+        console.log("Foto SAIME Existente");
+        let infoSAIME = await buscarSaimeA(tipo_doc+ced);
+        console.log(infoSAIME)
+        if(infoSAIME.error){
+            console.log("No existe Información...");
+            busqueda.id = uuid(); //Asignamos el id de la petición, el cual es generado por [UUID];
+            busqueda.procesado = false;
+            return await timePromise(10000, servicioSaime(tipo_doc, ced, busqueda.id, suk), suk).then(async dato=>{
+                if(dato.info==="true"){
+                    let iso = await paisToISO(dato.datos.paisNacimiento);
+                    console.log("Pais ISO", iso)
+                    if(dato.foto==="true"){
+                        suk.close();
+                        suk.disconnect();
+                        return {error: false, hayFoto: true, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: dato.datos, iso: iso}
+                    }else{
+                        suk.close();
+                        suk.disconnect();
+                        return {error: false, foto: "Sin Foto", datos: dato.datos, iso: iso}
+                    }
+                }else{
+                    suk.close();
+                    suk.disconnect();
+                    return {error: true, foto: "Persona no registrada en el SAIME", iso: ""}
+                }
+            }).catch(err=>{
+                suk.close();
+                suk.disconnect();
+                console.log("Error: ", err);
+                return {error: true, foto: "Sin Foto", iso: ""}
+            });
+        }else{
+            suk.close();
+            suk.disconnect();
+            return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg"}
+        }
     }else{
         //Primero verificamos el status del servicio
         //Para ello creamos una petición via Sockets
@@ -579,13 +611,13 @@ const buscarSAIME = async (cedula) => {
             }else{
                 return {error: true, foto: "Persona no registrada en el SAIME", iso: ""}
             }
-    }).catch(err=>{
-        suk.close();
-        suk.disconnect();
-        console.log("Error: ", err);
-        return {error: true, foto: "Sin Foto", iso: ""}
-    });
-}
+        }).catch(err=>{
+            suk.close();
+            suk.disconnect();
+            console.log("Error: ", err);
+            return {error: true, foto: "Sin Foto", iso: ""}
+        });
+    }
 }
 
 const buscarCNENombres = co.wrap(function* (datos){
