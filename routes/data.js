@@ -27,6 +27,8 @@ router.get('/cedula/:id', customMdw.ensureAuthenticated, DataController.buscarCe
 router.get('/infopersona/:id',DataController.buscarInfoSuscriptor);
 router.get('/buscarpersona', DataController.buscarPersonaNombres);
 router.get('/buscarpersonaid', DataController.buscarPersonaID);
+
+router.get('/buscarplacadiplomatica', DataController.findPlacaDiplomatica);
 // router.get('/intt', DataController.buscarINTT);
 
 router.post('/token/verificar', DataController.verificarToken);

@@ -136,14 +136,14 @@ const control = io.of('/botcontrol'); //Namespace: Control de los BOT
 //###Name espace: dashboard
 const logs = require('./controllers/logs');
 
-// var stream = clienteTwitter.stream('statuses/filter', {track: 'guaido, venezuela'});
+// var stream = clienteTwitter.stream('statuses/filter', {track: 'guaido, venezuela'});code
 
 // stream.on('data', (evento)=>{
 //     dashboard.emit("twitter", evento.text);
 // });
 
 dashboard.on('connection', (socket)=>{
-    console.log('(B)Hay 1 conexión: ', socket.id);
+    //console.log('(B)Hay 1 conexión: ', socket.id);
     socket.on('enviar-data', datos=>{
         console.log(datos)
     });
@@ -159,31 +159,31 @@ dashboard.on('connection', (socket)=>{
 
 //### | Namespace: control
 control.on('connection', socket=>{
-    console.log("Control: Hay 1 conexión: ", socket.id);
+    //console.log("Control: Hay 1 conexión: ", socket.id);
     
     //Iniciar Sesión SAIME
     socket.on('iniciar-sesion', ()=>{
-        console.log("Control: Solicitud de inicio de sesión al SAIME recibida");
-        console.log("Enviando comando al BOT");
+        //console.log("Control: Solicitud de inicio de sesión al SAIME recibida");
+        //console.log("Enviando comando al BOT");
         control.emit("control-inicio");
     });
 
     socket.on('buscar-cedula', data=>{
-        console.log("Control: Buscar la cédula: ", data);
-        console.log("Enviando comando al BOT");
+        //console.log("Control: Buscar la cédula: ", data);
+        //console.log("Enviando comando al BOT");
         busqueda.procesado = true;
         control.emit("control-cedula", data);
     });
 
     socket.on('respuesta-cedula', data=>{
-        console.log("Control: Respuesta de la solicitud de información de la cédula.");
-        console.log("Emitiendo información al cliente");
+        //console.log("Control: Respuesta de la solicitud de información de la cédula.");
+        //console.log("Emitiendo información al cliente");
         control.emit("ctrl-resp-cedula", data);
     });
 
     socket.on('check-status', (data)=>{
-        console.log("Control: Comprobando el estado de la sesión del SAIME");
-        console.log("Enviando Comando al BOT");
+        //console.log("Control: Comprobando el estado de la sesión del SAIME");
+        //console.log("Enviando Comando al BOT");
         if(Object.keys(io.of('/botcontrol').clients().connected).length < 2){
             control.emit('error-bot');
         }else{
@@ -192,25 +192,25 @@ control.on('connection', socket=>{
     });
 
     socket.on('bot-status', (data)=>{
-        console.log("Control: Respuesta de estado del Bot");
-        console.log("Enviando la respuesta al cliente");
+        //console.log("Control: Respuesta de estado del Bot");
+        //console.log("Enviando la respuesta al cliente");
         control.emit('response-status', data)
     });
 
     socket.on('bot-respuesta', (data)=>{
-        console.log("Control: Recibiendo Respuesta del Bot");
-        console.log("Control: Enviando la Respuesta al Cliente");
+        //console.log("Control: Recibiendo Respuesta del Bot");
+        //console.log("Control: Enviando la Respuesta al Cliente");
         control.emit("response-respuesta", data);
     })
 });
 
 //### | Namespace: suscriptores
 suscriptores.on('connection', (socket)=>{    
-    console.log('(A)Hay 1 Conexión: ', socket.id);
+    //console.log('(A)Hay 1 Conexión: ', socket.id);
 
     socket.on('enviar-data', (data)=>{
-        console.log("(A)Data recibida: ", data); 
-        console.log("Enviando mensaje a dashboard:");
+        //console.log("(A)Data recibida: ", data); 
+        //console.log("Enviando mensaje a dashboard:");
         dashboard.emit('data-sus', data);
     });
 
@@ -218,20 +218,20 @@ suscriptores.on('connection', (socket)=>{
         dashboard.emit('new-log', msg)
     });
 
-    console.log('User Conncetion');
+    // console.log('User Conncetion');
 
     socket.on('connect user', function(user){
-        console.log("Connected user ");
+        // console.log("Connected user ");
         io.emit('connect user', user);
     });
 
     socket.on('on typing', function(typing){
-        console.log("Typing.... ");
+        // console.log("Typing.... ");
         io.emit('on typing', typing);
     });
 
     socket.on('chat message', function(msg){
-        console.log("Message " + msg['message']);
+        // console.log("Message " + msg['message']);
         suscriptores.emit('chat message', msg);
     });
 
