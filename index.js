@@ -74,7 +74,6 @@ opts.secretOrKey = process.env.JWT_SECRET;
 opts.algorithms = [process.env.JWT_ALGORITHMS];
 
 passport.use(new JwtStrategy(opts, (jwt_payload, done)=>{
-    console.log("ENV:", process.env.DB_USERS)
     if(process.env.DB_USERS === "MONGODB"){
         console.log("Inicio Sesion MongoDB");
         user.findById(jwt_payload.sub).then(usuario=>{
@@ -86,8 +85,6 @@ passport.use(new JwtStrategy(opts, (jwt_payload, done)=>{
     }else{
         console.log("Estrategia MySQL");
         pool.query("Select * from usuario where idusuario='" + jwt_payload.sub + "'", (err, usuario) => {
-            console.log("Error Mysql: ", err);
-            console.log("Usuario Mysql:", usuario);
             if(err) return done(err, null) //Error en la bd
             if(usuario.length <=0) return done(null, false) //Usuario no encontrado
             return done(null, usuario[0]);

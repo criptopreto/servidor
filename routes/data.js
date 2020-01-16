@@ -32,7 +32,7 @@ router.get('/buscarpersonaid', DataController.buscarPersonaID);
 //Api Maps
 //CNE
 router.get('/api/cne/centros', ApiMapsController.allCenters);
-router.get('/api/cne/centros/polygons', ApiMapsController.centersByPolygons);
+router.post('/api/cne/centros/polygons', ApiMapsController.centersByPolygons);
 
 
 router.get('/buscarplacadiplomatica', DataController.findPlacaDiplomatica);
