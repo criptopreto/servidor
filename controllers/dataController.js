@@ -4,7 +4,7 @@ const Firma = require('../models/firma');
 const Bts = require('../models/bts');
 const axios = require('axios');
 const passport = require('passport');
-const {cne, centros, infocnes} = require('../models/cne');
+const {cne, centros_new, centros_old, infocnes} = require('../models/cne');
 const {persona_intt, licencia_intt, vehiculo_intt} = require('../models/intt');
 const {saime} = require('../models/saime');
 const {fanb} = require('../models/fanb');
@@ -195,7 +195,7 @@ async function buscarDBCharlie (dato){ // C -> Base de datos CNE Offline (versiÃ
     console.log("CNE MODO CHARLIE");
     var resp = {};
     return await cne.findOne({nacionalidad: dato.tipo, cedula: dato.cedula}).then(async (data)=>{
-        return await centros.findOne({cod_centro: data.cod_centro}, 'nombre_centro direccion_centro').then(datac=>{
+        return await centros_old.findOne({codigo: data.cod_centro}, 'nombre direccion').then(datac=>{
             resp.info = data;
             resp.error = false;
             resp.centro = datac;
