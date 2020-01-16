@@ -22,6 +22,7 @@ var Request = require('tedious').Request;
 const configMSSQL = require('../database.sqlserver');
 const jsonSql = require('json-sql')({dialect: 'mssql'});
 const co = require('co');
+const PlacasDiplomaticas = require('../models/placas_diplomaticas');
 
 async function RegistrarOnfalo(data){
     var dataPersona = {};
@@ -555,10 +556,42 @@ const buscarSAIME = async (cedula) => {
     
     var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
     if(existe){
-        console.log("Información SAIME Existente");
-        suk.close();
-        suk.disconnect();
-        return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg"}
+        console.log("Foto SAIME Existente");
+        let infoSAIME = await buscarSaimeA(tipo_doc+ced);
+        console.log(infoSAIME)
+        if(infoSAIME.error){
+            console.log("No existe Información...");
+            busqueda.id = uuid(); //Asignamos el id de la petición, el cual es generado por [UUID];
+            busqueda.procesado = false;
+            return await timePromise(10000, servicioSaime(tipo_doc, ced, busqueda.id, suk), suk).then(async dato=>{
+                if(dato.info==="true"){
+                    let iso = await paisToISO(dato.datos.paisNacimiento);
+                    console.log("Pais ISO", iso)
+                    if(dato.foto==="true"){
+                        suk.close();
+                        suk.disconnect();
+                        return {error: false, hayFoto: true, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg", datos: dato.datos, iso: iso}
+                    }else{
+                        suk.close();
+                        suk.disconnect();
+                        return {error: false, foto: "Sin Foto", datos: dato.datos, iso: iso}
+                    }
+                }else{
+                    suk.close();
+                    suk.disconnect();
+                    return {error: true, foto: "Persona no registrada en el SAIME", iso: ""}
+                }
+            }).catch(err=>{
+                suk.close();
+                suk.disconnect();
+                console.log("Error: ", err);
+                return {error: true, foto: "Sin Foto", iso: ""}
+            });
+        }else{
+            suk.close();
+            suk.disconnect();
+            return {error: false, foto: '/archivos/fotos/'+tipo_doc+ced+".jpg"}
+        }
     }else{
         //Primero verificamos el status del servicio
         //Para ello creamos una petición via Sockets
@@ -578,13 +611,13 @@ const buscarSAIME = async (cedula) => {
             }else{
                 return {error: true, foto: "Persona no registrada en el SAIME", iso: ""}
             }
-    }).catch(err=>{
-        suk.close();
-        suk.disconnect();
-        console.log("Error: ", err);
-        return {error: true, foto: "Sin Foto", iso: ""}
-    });
-}
+        }).catch(err=>{
+            suk.close();
+            suk.disconnect();
+            console.log("Error: ", err);
+            return {error: true, foto: "Sin Foto", iso: ""}
+        });
+    }
 }
 
 const buscarCNENombres = co.wrap(function* (datos){
@@ -602,12 +635,6 @@ const buscarCNENombres = co.wrap(function* (datos){
         personas.push(doc);
     }
     return personas;
-
-    // return await cne.find({primer_nombre: erPN, segundo_nombre: erSN, primer_apellido: erPA, segundo_apellido: erSA}).cursor().on('data', (persona)=>{
-    //     personas.push(persona);
-    // }).on('end', ()=>{
-    //     return personas;
-    // });
 });
 
 const buscarCNECedula = async(datos)=>{
@@ -621,8 +648,48 @@ const buscarCNECedula = async(datos)=>{
     });
 }
 
+const checkCantRegistros = async(datos)=>{
+    if(datos.PN === "" && datos.SN === "" && datos.PA === "" && datos.SA === ""){
+        return 0;
+    }
+    let erPN = new RegExp("^" + datos.PN);
+    let erSN = new RegExp("^" + datos.SN);
+    let erPA = new RegExp("^" + datos.PA);
+    let erSA = new RegExp("^" + datos.SA);
+    let cantidad = 0;
+    cantidad = await cne.countDocuments({primer_nombre: erPN, segundo_nombre: erSN, primer_apellido: erPA, segundo_apellido: erSA});
+    return cantidad;
+}
+
+const buscarPlacaDiplomatica = async(placa)=>{
+    if(!placa){
+        return {error: true, mensaje: "Placa Inválida"};
+    }
+    var re = /[0-9]+\-+[0-9]/;
+    var OK = re.exec(placa);
+    if(!OK){
+        return {error: true, mensaje: "Placa Inválida"};
+    }else{
+        var placa = placa.split("-");
+        var numero = placa[0];
+        return await PlacasDiplomaticas.findOne({NUMERO: numero}).then(diplomatico =>{
+            if(diplomatico){
+                return {error: false, dato: diplomatico};
+            }else{
+                return {error: true, mensaje: "Placa no Encontrada"}
+            }
+        }).catch(err=>{
+            return {error: true, mensaje: err};
+        });
+    }
+}
+
 
 let controller = {    
+    findPlacaDiplomatica: async(req, res)=>{
+        let infoPlaca = await buscarPlacaDiplomatica(req.query.placa);
+        res.json(infoPlaca);
+    },
     buscarPersonaID: async(req, res)=>{
         let datos = {};
         try {
@@ -660,7 +727,20 @@ let controller = {
                     personas.splice(i, 1, newPersona);
                 }
                 if(militar){
-                    let newMilitar = Object.assign({}, personas[i], {militar: true}, militar);
+                    let infoIPSFA = await buscarIpsfa(ced);
+                    let infoMil = {};
+                    if(!infoIPSFA.error){
+                        infoMil.APELLIDOS = infoIPSFA.info.Persona.DatoBasico.apellidoprimero;
+                        infoMil.NOMBRES = infoIPSFA.info.Persona.DatoBasico.nombreprimero;
+                        infoMil.CARNET = infoIPSFA.info.codigocomponente;
+                        infoMil.COMPONENTE = infoIPSFA.info.Componente.descripcion;            
+                        infoMil.GRADO = infoIPSFA.info.Grado.descripcion;
+                        infoMil.CATEGORIA = infoIPSFA.info.categoria;
+                        infoMil.GREMIO = infoIPSFA.info.clase;
+                    }else{
+                        infoMil = militar;
+                    }
+                    let newMilitar = Object.assign({}, personas[i], {militar: true}, infoMil);
                     personas.splice(i, 1, newMilitar);
                 }
             }
@@ -676,46 +756,67 @@ let controller = {
         datos.PA = req.query.PA;
         datos.SN = req.query.SN;
         datos.SA = req.query.SA;
-        buscarCNENombres(datos).then(async personas=>{
-            let cedulas = [];
-            for(let i=0;i<personas.length;i++){
-                cedulas.push(personas[i].cedula);
-            }
-            //Buscar información Militar
-            let infoMilitar = await fanb.find({CEDULA: {$in: cedulas}}).then(militares=>{
-                if(militares.length>0){
-                    return militares;
-                }else{
-                    return [];
+        //Comprobar la cantidad de registros
+
+        let cantidad = await checkCantRegistros(datos);
+        if(cantidad>5000){
+            res.json({cantidad: cantidad});
+        }else{
+            buscarCNENombres(datos).then(async personas=>{
+                let cedulas = [];
+                for(let i=0;i<personas.length;i++){
+                    cedulas.push(personas[i].cedula);
                 }
-            }).catch(err=>{
-                return [];
-            });
-            //Buscar Fotos Saime guardadas
-            for(let i =0;i < personas.length; i++){
-                let tipo_doc = personas[i].nacionalidad.toUpperCase();
-                let ced = personas[i].cedula;
-                var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
-                let militar;
-                //Militar
-                infoMilitar.findIndex(i=>{
-                    if(JSON.parse(JSON.stringify(i)).CEDULA===ced){
-                        militar = JSON.parse(JSON.stringify(i));
+                //Buscar información Militar
+                let infoMilitar = await fanb.find({CEDULA: {$in: cedulas}}).then(militares=>{
+                    if(militares.length>0){
+                        return militares;
+                    }else{
+                        return [];
                     }
+                }).catch(err=>{
+                    return [];
                 });
-                if(existe){
-                    let newPersona = Object.assign({}, personas[i], {foto: true});
-                    personas.splice(i, 1, newPersona);
+                //Buscar Fotos Saime guardadas
+                for(let i =0;i < personas.length; i++){
+                    let tipo_doc = personas[i].nacionalidad.toUpperCase();
+                    let ced = personas[i].cedula;
+                    var existe = await filePathExists('./public/fotos/'+tipo_doc+ced +".jpg").then(res=>{return res}).catch(err=>{return err});
+                    let militar;
+                    //Militar
+                    infoMilitar.findIndex(i=>{
+                        if(JSON.parse(JSON.stringify(i)).CEDULA===ced){
+                            militar = JSON.parse(JSON.stringify(i));
+                        }
+                    });
+                    if(existe){                    
+                        let newPersona = Object.assign({}, personas[i], {foto: true});
+                        personas.splice(i, 1, newPersona);
+                    }
+                    if(militar){
+                        let infoIPSFA = await buscarIpsfa(ced);
+                        let infoMil = {};
+                        if(!infoIPSFA.error){
+                            infoMil.APELLIDOS = infoIPSFA.info.Persona.DatoBasico.apellidoprimero;
+                            infoMil.NOMBRES = infoIPSFA.info.Persona.DatoBasico.nombreprimero;
+                            infoMil.CARNET = infoIPSFA.info.codigocomponente;
+                            infoMil.COMPONENTE = infoIPSFA.info.Componente.descripcion;            
+                            infoMil.GRADO = infoIPSFA.info.Grado.descripcion;
+                            infoMil.CATEGORIA = infoIPSFA.info.categoria;
+                            infoMil.GREMIO = infoIPSFA.info.clase;
+                        }else{
+                            infoMil = militar;
+                        }
+                        let newMilitar = Object.assign({}, personas[i], {militar: true}, infoMil);
+                        personas.splice(i, 1, newMilitar);
+                    }
                 }
-                if(militar){
-                    let newMilitar = Object.assign({}, personas[i], {militar: true}, militar);
-                    personas.splice(i, 1, newMilitar);
-                }
-            }
-            res.json(personas);
-        }).catch(()=>{
-            res.json([]);
-        });
+                res.json(personas);
+            }).catch(err=>{
+                console.log(err);
+                res.json([]);
+            });
+        }
     },
     buscarNumero: async (req, res, next) =>{
         //data = {idusuario, tipo_busqueda, dato_buscado, timestamp}
