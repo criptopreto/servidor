@@ -9,10 +9,23 @@ const CneSchema = new Schema({
     cod_centro: {type: String},
 }, {collection: 'cne'});
 
-const CentrosSchema = new Schema({
-    cod_centro: {type: String},
-    nombre_centro: {type: String},
-    direccion_centro: {type: String},
+const CentrosOldSchema = new Schema({
+    codigo: {type: String},
+    nombre: {type: String},
+    direccion: {type: String},
+    cod_nuevi: {type: String}
+}, {collection: 'cne_centros_old'});
+
+const CentrosNewSchema = new Schema({
+    CODIGO: {type: String},
+    NOMBRE: {type: String},
+    DIRECCION: {type: String},
+    REDI: {type: String},
+    ZODI: {type: String},
+    ESTADO: {type: String},
+    MUNICIPIO: {type: String},
+    PARROQUIA: {type: String},
+    COORDENADAS: {type: {type: String, enum: ["Point"]}}
 }, {collection: 'cne_centros'});
 
 const InfocnesSchema = new Schema({
@@ -27,6 +40,7 @@ const InfocnesSchema = new Schema({
 
 module.exports = {
     cne: model('cne', CneSchema),
-    centros: model('cne_centros', CentrosSchema),
+    centros_new: model('cne_centros', CentrosNewSchema),
+    centros_old: model('cne_centros_old', CentrosOldSchema),
     infocnes: model('infocnes', InfocnesSchema)
 }
