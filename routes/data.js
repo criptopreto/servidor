@@ -48,4 +48,7 @@ router.post('/perfil/avatar/:id',  upload.single('avatar'),(req, res) => {
     res.json({msg: uuid()})
 });
 
+//ARRA
+router.post('/firmantes', DataController.buscarFirmantes);
+
 module.exports = router; 

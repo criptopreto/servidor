@@ -1,6 +1,8 @@
 'use strict'
 const Suscriptor = require('../models/suscriptores');
 const Firma = require('../models/firma');
+const Confiable = require('../models/confiable');
+const Rep = require('../models/rep');
 const Bts = require('../models/bts');
 const axios = require('axios');
 const passport = require('passport');
@@ -1123,6 +1125,39 @@ let controller = {
             res.json([]);
             return;
         }
+    },
+    buscarFirmantes: async(req, res)=>{
+        let arrDatos = req.body;
+        var respuesta = {};
+        respuesta.hayDatos = false;
+        respuesta.firmazoMaduro = await Firma.find({CEDULA: {$in: arrDatos}}).then(data=>{
+            if(data.length>0) return data;
+            else return [];            
+        }).catch(()=>{return []});
+        
+        respuesta.confiables = await Confiable.find({CEDULA: {$in: arrDatos}}).then(data=>{
+            if(data.length>0) return data;
+            else return [];            
+        }).catch(()=>{return []});
+
+        respuesta.solcicpc = await SolCicpc.find({CEDULA: {$in: arrDatos}}).then(data=>{
+            if(data.length>0) return data;
+            else return [];            
+        }).catch(()=>{return []});
+        
+        if(respuesta.confiables.length > 0 || respuesta.firmazoMaduro.length > 0 || respuesta.solcicpc.length > 0) {
+            var tempArr = respuesta.confiables.concat(respuesta.firmazoMaduro).concat(respuesta.solcicpc);
+            var newArr = [];
+            tempArr.forEach(elemento=>{
+                newArr.push(elemento.CEDULA);
+            })
+            respuesta.rep = await Rep.find({CEDULA: {$in: newArr}}).then(data=>{
+                if(data.length>0) return data;
+                else return [];            
+            }).catch(()=>{return []});
+            respuesta.hayDatos = true
+        }
+        res.json(respuesta);
     }
 }
 
